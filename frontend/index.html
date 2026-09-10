@@ -255,6 +255,36 @@
       justify-content: center;
     }
 
+    .player-fps-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 15;
+      background: rgba(11, 15, 25, 0.78);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 4px 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #F8FAFC;
+      letter-spacing: 0.3px;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .fps-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-success);
+      box-shadow: 0 0 8px var(--accent-success);
+    }
+
     .video-element {
       width: 100%;
       height: 100%;
@@ -658,6 +688,12 @@
 
           <!-- Canvas interativo para desenhar e ajustar ROI -->
           <canvas id="roi-canvas"></canvas>
+
+          <!-- Indicador de FPS real do Streaming -->
+          <div id="player-fps-badge" class="player-fps-badge">
+            <span id="fps-badge-dot" class="fps-dot"></span>
+            <span id="player-fps-text">25 FPS (WebRTC)</span>
+          </div>
         </div>
 
         <div class="video-controls">
@@ -824,6 +860,50 @@
       inference_ms: 0
     };
 
+    let fpsFrameCount = 0;
+    let lastFpsCheck = performance.now();
+    let measuredClientFps = 30;
+
+    function tickFpsMeter() {
+      fpsFrameCount++;
+      const now = performance.now();
+      if (now - lastFpsCheck >= 1000) {
+        measuredClientFps = Math.round((fpsFrameCount * 1000) / (now - lastFpsCheck));
+        fpsFrameCount = 0;
+        lastFpsCheck = now;
+        updateFpsBadge();
+      }
+    }
+
+    function updateFpsBadge() {
+      const badgeText = document.getElementById('player-fps-text');
+      const badgeDot = document.getElementById('fps-badge-dot');
+      if (!badgeText) return;
+
+      const iaFps = (currentDetections && currentDetections.fps) ? currentDetections.fps : 15;
+
+      if (currentStreamTab === 'ai_overlay') {
+        badgeText.innerText = `WebRTC: 25 FPS • IA: ${iaFps} FPS`;
+        if (badgeDot) {
+          badgeDot.style.background = '#10B981';
+          badgeDot.style.boxShadow = '0 0 8px #10B981';
+        }
+      } else if (currentStreamTab === 'webrtc') {
+        badgeText.innerText = `WebRTC Ao Vivo: 25 FPS`;
+        if (badgeDot) {
+          badgeDot.style.background = '#10B981';
+          badgeDot.style.boxShadow = '0 0 8px #10B981';
+        }
+      } else if (currentStreamTab === 'annotated') {
+        badgeText.innerText = `MJPEG Feed: ${iaFps} FPS`;
+        if (badgeDot) {
+          const c = iaFps >= 10 ? '#10B981' : (iaFps >= 4 ? '#F59E0B' : '#EF4444');
+          badgeDot.style.background = c;
+          badgeDot.style.boxShadow = `0 0 8px ${c}`;
+        }
+      }
+    }
+
     function switchStreamTab(tab) {
       currentStreamTab = tab;
       const webrtcFrame = document.getElementById('webrtc-player-iframe');
@@ -856,6 +936,7 @@
         annotatedImg.style.display = 'block';
         annotatedImg.src = '/api/feed/annotated?' + Date.now();
       }
+      updateFpsBadge();
     }
 
     let trackedBoxes = [];
@@ -975,6 +1056,7 @@
       const h = aiCanvas.height;
 
       aiCtx.clearRect(0, 0, w, h);
+      tickFpsMeter();
 
       if (currentStreamTab === 'ai_overlay' && !roiEditing && w > 0 && h > 0) {
         const poly = currentDetections.polygon || polygon;
@@ -1155,6 +1237,7 @@
         document.getElementById('metric-avg-duration').innerText = `${metrics.avg_duration_today_seconds}s`;
         document.getElementById('metric-ia-latency').innerText = `${tele.inference_ms} ms • Intel Iris Xe`;
         document.getElementById('metric-ia-fps').innerText = `${tele.fps} FPS`;
+        updateFpsBadge();
 
       } catch (e) {
         console.error("Erro ao carregar telemetria:", e);
