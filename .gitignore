@@ -1,0 +1,33 @@
+# Ambientes Virtuais Python
+.venv/
+venv/
+ENV/
+env/
+
+# Caches do Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Modelos locais e pesos de IA (baixados automaticamente)
+*.pt
+*.onnx
+*.bin
+openvino_model/
+
+# Banco de dados e gravações de vídeo
+data/events.db
+data/events.db-journal
+data/recordings/*
+!data/recordings/.gitkeep
+
+# Executáveis binários pesados (go2rtc é baixado pelo script de setup)
+bin/*.exe
+bin/*.zip
+
+# IDEs e Sistema
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
