@@ -498,7 +498,7 @@ class CatCamDetector:
             if obj_count > 0:
                 is_inside_list = self.zone.trigger(detections=detections) if self.zone is not None else [False] * obj_count
                 for idx, (box, class_id, conf) in enumerate(zip(detections.xyxy, detections.class_id, detections.confidence)):
-                    tracker_id = detections.tracker_id[idx] if detections.tracker_id is not None else None
+                    tracker_id = int(detections.tracker_id[idx]) if (detections.tracker_id is not None and detections.tracker_id[idx] is not None) else None
                     x1_n = round(float(box[0]) / infer_w, 4)
                     y1_n = round(float(box[1]) / infer_h, 4)
                     x2_n = round(float(box[2]) / infer_w, 4)
@@ -524,7 +524,7 @@ class CatCamDetector:
                         name = CLASS_NAMES_PT.get(c_id, f"ID:{c_id}")
 
                     objects_payload.append({
-                        "id": tracker_id if tracker_id is not None else idx,
+                        "id": tracker_id if tracker_id is not None else int(idx),
                         "box": [x1_n, y1_n, x2_n, y2_n],
                         "class_id": c_id,
                         "label": f"{name} #{tracker_id}" if tracker_id is not None else name,

@@ -11,7 +11,7 @@ from typing import List, Optional
 
 # Setup imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from backend.database import init_db, get_visits, delete_visit
+from backend.database import init_db, get_visits, delete_visit, get_visits_breakdown
 from backend.detector import detector, CONFIG_PATH, RECORDINGS_DIR
 
 # Inicializa banco de dados
@@ -53,12 +53,14 @@ def get_status():
     visits_today = get_visits(filter_range="today", limit=100)
     total_today = len(visits_today)
     avg_duration = round(sum(v["duration_seconds"] for v in visits_today) / total_today) if total_today > 0 else 0
+    breakdown = get_visits_breakdown(filter_range="today")
 
     return {
         "telemetry": detector.status,
         "metrics": {
             "total_visits_today": total_today,
-            "avg_duration_today_seconds": avg_duration
+            "avg_duration_today_seconds": avg_duration,
+            "breakdown": breakdown
         }
     }
 

@@ -174,6 +174,62 @@
       color: var(--text-muted);
     }
 
+    /* Barra de Contagens por Alvo Configurado */
+    .target-counts-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-top: -12px;
+      margin-bottom: 24px;
+      padding: 12px 18px;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+    }
+
+    .target-counts-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 6px;
+    }
+
+    .target-count-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+    }
+
+    .target-count-chip:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .target-count-num {
+      background: rgba(99, 102, 241, 0.25);
+      color: #A5B4FC;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
     /* Layout Principal */
     .main-grid {
       display: grid;
@@ -732,6 +788,16 @@
         <div class="metric-label">Performance da IA</div>
         <div id="metric-ia-fps" class="metric-value">0.0 FPS</div>
         <div id="metric-ia-latency" class="metric-subtext">0 ms • Intel Iris Xe</div>
+      </div>
+    </div>
+
+    <!-- Barra de Contagens de Movimentações por Alvo -->
+    <div id="target-counts-bar" class="target-counts-bar">
+      <div class="target-counts-title">🎯 Registros Hoje:</div>
+      <div id="target-chips-list" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span class="target-count-chip">🧡 Beatriz: <span class="target-count-num" id="cnt-beatriz">0</span></span>
+        <span class="target-count-chip">🩶 Serena: <span class="target-count-num" id="cnt-serena">0</span></span>
+        <span class="target-count-chip">🐾 Ambos: <span class="target-count-num" id="cnt-ambos">0</span></span>
       </div>
     </div>
 
@@ -1313,6 +1379,36 @@
         document.getElementById('metric-ia-latency').innerText = `${tele.inference_ms} ms • Intel Iris Xe`;
         document.getElementById('metric-ia-fps').innerText = `${tele.fps} FPS`;
         updateFpsBadge();
+
+        if (metrics && metrics.breakdown) {
+          const bd = metrics.breakdown;
+          const chipsContainer = document.getElementById('target-chips-list');
+          if (chipsContainer) {
+            let bCount = 0;
+            let sCount = 0;
+            let aCount = 0;
+            let otherHtml = '';
+
+            for (const [name, count] of Object.entries(bd)) {
+              if (name.includes('Beatriz')) {
+                bCount += count;
+              } else if (name.includes('Serena')) {
+                sCount += count;
+              } else if (name.includes('Ambos')) {
+                aCount += count;
+              } else {
+                otherHtml += `<span class="target-count-chip">${name}: <span class="target-count-num">${count}</span></span>`;
+              }
+            }
+
+            chipsContainer.innerHTML = `
+              <span class="target-count-chip">🧡 Beatriz: <span class="target-count-num">${bCount}</span></span>
+              <span class="target-count-chip">🩶 Serena: <span class="target-count-num">${sCount}</span></span>
+              <span class="target-count-chip">🐾 Ambos: <span class="target-count-num">${aCount}</span></span>
+              ${otherHtml}
+            `;
+          }
+        }
 
       } catch (e) {
         console.error("Erro ao carregar telemetria:", e);

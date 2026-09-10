@@ -83,6 +83,31 @@ def delete_visit(visit_id: int) -> bool:
     conn.close()
     return deleted
 
+def get_visits_breakdown(filter_range: Optional[str] = "today") -> Dict[str, int]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = "SELECT visitor_name, COUNT(*) as count FROM visits"
+    params = []
+    if filter_range == "today":
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        query += " WHERE start_time LIKE ?"
+        params.append(f"{today_str}%")
+    elif filter_range == "yesterday":
+        yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        query += " WHERE start_time LIKE ?"
+        params.append(f"{yesterday_str}%")
+    elif filter_range == "week":
+        week_ago_str = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        query += " WHERE start_time >= ?"
+        params.append(week_ago_str)
+
+    query += " GROUP BY visitor_name"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    breakdown = {row["visitor_name"]: row["count"] for row in rows}
+    conn.close()
+    return breakdown
+
 if __name__ == "__main__":
     init_db()
     print("Database initialized successfully at:", DB_PATH)
