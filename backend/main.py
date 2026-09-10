@@ -30,9 +30,12 @@ FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fr
 os.makedirs(FRONTEND_DIR, exist_ok=True)
 
 class ROIUpdateRequest(BaseModel):
-    polygon: List[List[float]]
+    polygon: Optional[List[List[float]]] = None
     confidence_threshold: Optional[float] = None
     debounce_seconds: Optional[int] = None
+    target_fps: Optional[int] = None
+    target_mode: Optional[str] = None
+    color_filter: Optional[str] = None
 
 @app.on_event("startup")
 def startup_event():
@@ -83,9 +86,12 @@ def update_roi(payload: ROIUpdateRequest):
         detector.save_roi_config(
             polygon=payload.polygon,
             confidence=payload.confidence_threshold,
-            debounce=payload.debounce_seconds
+            debounce=payload.debounce_seconds,
+            target_fps=payload.target_fps,
+            target_mode=payload.target_mode,
+            color_filter=payload.color_filter
         )
-        return {"status": "success", "message": "ROI atualizado com sucesso!"}
+        return {"status": "success", "message": "Configurações atualizadas com sucesso!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

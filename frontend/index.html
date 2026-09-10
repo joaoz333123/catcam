@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CatCam Monitor • Inteligência Artificial Local</title>
+  <title>CatCam AI Monitor • Visão Computacional Local</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
       --bg-card: rgba(18, 24, 38, 0.75);
       --bg-card-hover: rgba(26, 34, 53, 0.85);
       --border-card: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(99, 102, 241, 0.3);
+      --border-accent: rgba(99, 102, 241, 0.35);
       --text-primary: #F8FAFC;
       --text-secondary: #94A3B8;
       --text-muted: #64748B;
@@ -47,7 +47,6 @@
         radial-gradient(circle at 85% 85%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
     }
 
-    /* Container Principal */
     .container {
       max-width: 1400px;
       margin: 0 auto;
@@ -59,7 +58,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       padding-bottom: 20px;
       border-bottom: 1px solid var(--border-card);
     }
@@ -71,14 +70,14 @@
     }
 
     .brand-icon {
-      width: 44px;
-      height: 44px;
+      width: 46px;
+      height: 46px;
       background: linear-gradient(135deg, var(--accent-primary), #818CF8);
       border-radius: var(--radius-md);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
+      font-size: 24px;
       box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
     }
 
@@ -94,7 +93,6 @@
     .brand-title p {
       font-size: 13px;
       color: var(--text-muted);
-      font-weight: 400;
     }
 
     .header-actions {
@@ -136,7 +134,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 18px;
-      margin-bottom: 28px;
+      margin-bottom: 26px;
     }
 
     .metric-card {
@@ -158,14 +156,11 @@
     }
 
     .metric-label {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-secondary);
-      font-weight: 500;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
     .metric-value {
@@ -179,10 +174,10 @@
       color: var(--text-muted);
     }
 
-    /* Layout Principal (Grid 2 colunas) */
+    /* Layout Principal */
     .main-grid {
       display: grid;
-      grid-template-columns: 1.25fr 1fr;
+      grid-template-columns: 1.3fr 1fr;
       gap: 24px;
     }
 
@@ -192,7 +187,7 @@
       }
     }
 
-    /* Seção de Vídeo */
+    /* Painel de Vídeo */
     .video-panel {
       background: var(--bg-card);
       backdrop-filter: blur(12px);
@@ -209,6 +204,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .video-panel-title {
@@ -245,7 +242,6 @@
       box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
     }
 
-    /* Container do Player e Canvas */
     .player-container {
       position: relative;
       width: 100%;
@@ -289,8 +285,11 @@
       justify-content: space-between;
       align-items: center;
       padding-top: 4px;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
+    /* Botões */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -336,7 +335,7 @@
       color: #FFF;
     }
 
-    /* Seção de Histórico */
+    /* Painel de Histórico */
     .history-panel {
       background: var(--bg-card);
       backdrop-filter: blur(12px);
@@ -382,7 +381,6 @@
       color: #FFF;
     }
 
-    /* Tabela de Visitas */
     .table-container {
       overflow-y: auto;
       max-height: 520px;
@@ -444,7 +442,7 @@
       font-size: 14px;
     }
 
-    /* Modal do Player de Vídeo */
+    /* Modal Genérico */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -508,6 +506,65 @@
       height: 100%;
       display: block;
     }
+
+    /* Modal de Configurações da IA */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .form-select, .form-input {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-card);
+      color: var(--text-primary);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .form-select:focus, .form-input:focus {
+      border-color: var(--accent-primary);
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent-primary);
+      height: 6px;
+      border-radius: 3px;
+    }
+
+    .slider-val {
+      font-weight: 700;
+      color: var(--accent-primary);
+      min-width: 50px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -516,13 +573,16 @@
     <!-- Header -->
     <header>
       <div class="brand">
-        <div class="brand-icon">🐱</div>
+        <div class="brand-icon">⚡</div>
         <div class="brand-title">
-          <h1>CatCam Monitor</h1>
-          <p>Visão Computacional 100% Local • YOLO11n + OpenVINO</p>
+          <h1>CatCam AI Vision</h1>
+          <p>YOLO11n + Intel OpenVINO • Detecção & Rastreamento em Tempo Real</p>
         </div>
       </div>
       <div class="header-actions">
+        <button id="btn-open-settings" class="btn btn-outline" onclick="openSettingsModal()">
+          ⚙️ Configurações da IA
+        </button>
         <div id="status-chip" class="chip-indicator">
           <span class="chip-dot"></span>
           <span id="status-chip-text">Conectando...</span>
@@ -536,24 +596,24 @@
     <!-- Cards de Métricas -->
     <div class="metrics-grid">
       <div class="metric-card">
-        <div class="metric-label">Status da Caixa</div>
+        <div class="metric-label" id="card-label-status">Status da Área</div>
         <div id="metric-box-status" class="metric-value" style="color: var(--accent-success);">Livre</div>
-        <div id="metric-box-sub" class="metric-subtext">Nenhum felino na área</div>
+        <div id="metric-box-sub" class="metric-subtext">Nenhum objeto detectado na zona</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Visitas Hoje</div>
+        <div class="metric-label" id="card-label-count">Eventos Hoje</div>
         <div id="metric-today-visits" class="metric-value">0</div>
         <div class="metric-subtext">Total registrado no dia</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Duração Média</div>
         <div id="metric-avg-duration" class="metric-value">0s</div>
-        <div class="metric-subtext">Tempo médio por visita</div>
+        <div class="metric-subtext">Tempo médio de permanência</div>
       </div>
       <div class="metric-card">
         <div class="metric-label">Performance da IA</div>
-        <div id="metric-ia-latency" class="metric-value">0 ms</div>
-        <div id="metric-ia-fps" class="metric-subtext">0.0 FPS • Intel Iris Xe</div>
+        <div id="metric-ia-fps" class="metric-value">0.0 FPS</div>
+        <div id="metric-ia-latency" class="metric-subtext">0 ms • Intel Iris Xe</div>
       </div>
     </div>
 
@@ -563,7 +623,7 @@
       <div class="video-panel">
         <div class="video-panel-header">
           <div class="video-panel-title">
-            <span>📹 Transmissão da Câmera</span>
+            <span id="video-stream-title">📹 Transmissão da Câmera</span>
           </div>
           <div class="video-tabs">
             <button id="tab-webrtc" class="video-tab-btn active" onclick="switchStreamTab('webrtc')">Ao Vivo (WebRTC)</button>
@@ -585,12 +645,12 @@
         <div class="video-controls">
           <div>
             <span id="roi-edit-hint" style="font-size: 13px; color: var(--text-muted); display: none;">
-              Arraste os 4 círculos nos cantos para delimitar a caixa de areia.
+              Arraste os 4 círculos nos cantos para delimitar a zona de interesse.
             </span>
           </div>
           <div style="display: flex; gap: 8px;">
             <button id="btn-toggle-roi" class="btn btn-outline" onclick="toggleROIEditor()">
-              📐 Ajustar Caixa de Areia
+              📐 Ajustar Área de Interesse
             </button>
             <button id="btn-save-roi" class="btn btn-primary" onclick="saveROIPolygon()" style="display: none;">
               💾 Salvar Área
@@ -603,7 +663,7 @@
       <div class="history-panel">
         <div class="history-header">
           <div style="font-weight: 600; font-size: 16px;">
-            <span>📋 Histórico de Visitas</span>
+            <span>📋 Histórico de Eventos</span>
           </div>
           <div class="filter-group">
             <button class="filter-btn active" onclick="setFilter('today', this)">Hoje</button>
@@ -617,8 +677,8 @@
           <table id="visits-table">
             <thead>
               <tr>
-                <th>Entrada</th>
-                <th>Saída</th>
+                <th>Início</th>
+                <th>Término</th>
                 <th>Duração</th>
                 <th>Ações</th>
               </tr>
@@ -638,11 +698,81 @@
   <div id="video-modal" class="modal-overlay">
     <div class="modal-content">
       <div class="modal-header">
-        <div id="modal-video-title" class="modal-title">Clipe da Visita</div>
+        <div id="modal-video-title" class="modal-title">Clipe do Evento</div>
         <button class="modal-close" onclick="closeVideoModal()">&times;</button>
       </div>
       <div class="modal-video-wrapper">
         <video id="modal-video-player" controls preload="auto"></video>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Configurações da IA -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-header">
+        <div class="modal-title">⚙️ Configurações da Inteligência Artificial</div>
+        <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+      </div>
+      
+      <div class="settings-grid">
+        <!-- Modo de Detecção -->
+        <div class="form-group">
+          <label class="form-label">O que a IA deve buscar:</label>
+          <select id="cfg-mode" class="form-select" onchange="onModeChange()">
+            <option value="cat">🐱 Gatos (Monitor de Pet / Caixa de Areia)</option>
+            <option value="vehicles">🚗 Carros & Veículos (Trânsito / Rua)</option>
+            <option value="person">👤 Pessoas (Segurança / Entrada)</option>
+            <option value="dog">🐶 Cachorros</option>
+            <option value="all">🌐 Todos os 80 Objetos (COCO Dataset)</option>
+          </select>
+        </div>
+
+        <!-- Filtro Opcional de Cor -->
+        <div class="form-group">
+          <label class="form-label">Filtro de Cor (Opcional):</label>
+          <select id="cfg-color" class="form-select">
+            <option value="none">Qualquer Cor (Sem filtro)</option>
+            <option value="white">⚪ Apenas Branco (ex: Carros Brancos)</option>
+            <option value="black">⚫ Apenas Preto</option>
+            <option value="red">🔴 Apenas Vermelho</option>
+          </select>
+        </div>
+
+        <!-- Taxa de Quadros (FPS) -->
+        <div class="form-group" style="grid-column: span 2;">
+          <label class="form-label">Taxa de Quadros da IA (FPS):</label>
+          <div class="slider-row">
+            <input type="range" id="cfg-fps" min="2" max="25" step="1" value="15" oninput="document.getElementById('val-fps').innerText = this.value + ' FPS'">
+            <span id="val-fps" class="slider-val">15 FPS</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted);">
+            2 FPS = Máxima economia de energia • 15–20 FPS = Rastreamento ultra fluido em tempo real.
+          </span>
+        </div>
+
+        <!-- Confiança Mínima -->
+        <div class="form-group">
+          <label class="form-label">Sensibilidade da IA:</label>
+          <div class="slider-row">
+            <input type="range" id="cfg-conf" min="20" max="85" step="5" value="45" oninput="document.getElementById('val-conf').innerText = this.value + '%'">
+            <span id="val-conf" class="slider-val">45%</span>
+          </div>
+        </div>
+
+        <!-- Debounce de Saída -->
+        <div class="form-group">
+          <label class="form-label">Tolerância de Saída (Debounce):</label>
+          <div class="slider-row">
+            <input type="range" id="cfg-debounce" min="2" max="15" step="1" value="5" oninput="document.getElementById('val-debounce').innerText = this.value + 's'">
+            <span id="val-debounce" class="slider-val">5s</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+        <button class="btn btn-outline" onclick="closeSettingsModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveAISettings()">💾 Salvar Configurações</button>
       </div>
     </div>
   </div>
@@ -661,7 +791,6 @@
     const canvas = document.getElementById('roi-canvas');
     const ctx = canvas.getContext('2d');
 
-    // Alternar abas de vídeo
     function switchStreamTab(tab) {
       const webrtcFrame = document.getElementById('webrtc-player-iframe');
       const annotatedImg = document.getElementById('annotated-img');
@@ -683,7 +812,6 @@
       }
     }
 
-    // Telemetria Periódica
     async function loadStatus() {
       try {
         const res = await fetch('/api/status');
@@ -693,48 +821,50 @@
         const tele = data.telemetry;
         const metrics = data.metrics;
 
-        // Status Chip
         const chip = document.getElementById('status-chip');
         const chipText = document.getElementById('status-chip-text');
         if (tele.camera_online) {
           chip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
           chip.style.color = 'var(--accent-success)';
-          chipText.innerText = 'Câmera Conectada';
+          chipText.innerText = `Câmera Online (${tele.target_fps} FPS)`;
         } else {
           chip.style.borderColor = 'rgba(239, 68, 68, 0.3)';
           chip.style.color = 'var(--accent-danger)';
           chipText.innerText = 'Câmera Offline';
         }
 
-        // Status Caixa
         const boxStatus = document.getElementById('metric-box-status');
         const boxSub = document.getElementById('metric-box-sub');
-        if (tele.cat_in_litterbox) {
-          boxStatus.innerText = '🐱 Ocupada';
+
+        let objectName = 'Objeto';
+        if (tele.target_mode === 'cat') objectName = 'Gata';
+        else if (tele.target_mode === 'vehicles') objectName = 'Veículo';
+        else if (tele.target_mode === 'person') objectName = 'Pessoa';
+
+        if (tele.object_in_zone) {
+          boxStatus.innerText = `🚨 ${objectName} na Zona`;
           boxStatus.style.color = 'var(--accent-danger)';
-          boxSub.innerText = `Gata na caixa há ${tele.visit_duration}s`;
-        } else if (tele.cat_detected) {
-          boxStatus.innerText = 'Livre';
+          boxSub.innerText = `Detectado na área há ${tele.visit_duration}s`;
+        } else if (tele.object_detected) {
+          boxStatus.innerText = 'Área Livre';
           boxStatus.style.color = 'var(--accent-warning)';
-          boxSub.innerText = 'Gata avistada fora da caixa';
+          boxSub.innerText = `${objectName} avistado fora da zona demarcada`;
         } else {
-          boxStatus.innerText = 'Livre';
+          boxStatus.innerText = 'Área Livre';
           boxStatus.style.color = 'var(--accent-success)';
-          boxSub.innerText = tele.last_event_time ? `Última saída às ${tele.last_event_time}` : 'Nenhum felino na área';
+          boxSub.innerText = tele.last_event_time ? `Última saída às ${tele.last_event_time}` : 'Nenhum objeto na área';
         }
 
-        // Métricas
         document.getElementById('metric-today-visits').innerText = metrics.total_visits_today;
         document.getElementById('metric-avg-duration').innerText = `${metrics.avg_duration_today_seconds}s`;
-        document.getElementById('metric-ia-latency').innerText = `${tele.inference_ms} ms`;
-        document.getElementById('metric-ia-fps').innerText = `${tele.fps} FPS • Intel Iris Xe`;
+        document.getElementById('metric-ia-latency').innerText = `${tele.inference_ms} ms • Intel Iris Xe`;
+        document.getElementById('metric-ia-fps').innerText = `${tele.fps} FPS`;
 
       } catch (e) {
         console.error("Erro ao carregar telemetria:", e);
       }
     }
 
-    // Carregar Visitas
     async function loadVisits() {
       try {
         const url = currentFilter === 'all' ? '/api/visits' : `/api/visits?range=${currentFilter}`;
@@ -744,7 +874,7 @@
         
         const tbody = document.getElementById('visits-tbody');
         if (!visits || visits.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhuma visita registrada neste período.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhum evento registrado neste período.</td></tr>';
           return;
         }
 
@@ -792,23 +922,22 @@
     }
 
     async function deleteVisit(id) {
-      if (!confirm("Deseja realmente apagar este registro de visita?")) return;
+      if (!confirm("Deseja realmente apagar este registro de evento?")) return;
       try {
         await fetch(`/api/visits/${id}`, { method: 'DELETE' });
         loadVisits();
         loadStatus();
       } catch (e) {
-        alert("Erro ao excluir visita.");
+        alert("Erro ao excluir evento.");
       }
     }
 
-    // Modal de Vídeo
     function openVideoModal(filename, startTime, duration) {
       const modal = document.getElementById('video-modal');
       const player = document.getElementById('modal-video-player');
       const title = document.getElementById('modal-video-title');
 
-      title.innerText = `Visita de ${startTime} (${duration} segundos)`;
+      title.innerText = `Evento de ${startTime} (${duration} segundos)`;
       player.src = `/api/recordings/${filename}`;
       modal.style.display = 'flex';
       player.play();
@@ -822,13 +951,68 @@
       modal.style.display = 'none';
     }
 
-    // Editor Visual de ROI (Caixa de Areia)
+    // Modal de Configurações da IA
+    function openSettingsModal() {
+      document.getElementById('settings-modal').style.display = 'flex';
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').style.display = 'none';
+    }
+
+    async function saveAISettings() {
+      const mode = document.getElementById('cfg-mode').value;
+      const color = document.getElementById('cfg-color').value;
+      const fps = parseInt(document.getElementById('cfg-fps').value);
+      const conf = parseFloat(document.getElementById('cfg-conf').value) / 100.0;
+      const debounce = parseInt(document.getElementById('cfg-debounce').value);
+
+      try {
+        const res = await fetch('/api/roi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target_mode: mode,
+            color_filter: color,
+            target_fps: fps,
+            confidence_threshold: conf,
+            debounce_seconds: debounce
+          })
+        });
+
+        if (res.ok) {
+          closeSettingsModal();
+          loadStatus();
+          alert('Configurações da IA salvas com sucesso!');
+        } else {
+          alert('Erro ao salvar configurações.');
+        }
+      } catch (e) {
+        alert('Erro ao conectar ao servidor.');
+      }
+    }
+
     async function loadROIConfig() {
       try {
         const res = await fetch('/api/roi');
         if (res.ok) {
           const data = await res.json();
           if (data.polygon) polygon = data.polygon;
+          if (data.target_mode) document.getElementById('cfg-mode').value = data.target_mode;
+          if (data.color_filter) document.getElementById('cfg-color').value = data.color_filter;
+          if (data.target_fps) {
+            document.getElementById('cfg-fps').value = data.target_fps;
+            document.getElementById('val-fps').innerText = data.target_fps + ' FPS';
+          }
+          if (data.confidence_threshold) {
+            const pct = Math.round(data.confidence_threshold * 100);
+            document.getElementById('cfg-conf').value = pct;
+            document.getElementById('val-conf').innerText = pct + '%';
+          }
+          if (data.debounce_seconds) {
+            document.getElementById('cfg-debounce').value = data.debounce_seconds;
+            document.getElementById('val-debounce').innerText = data.debounce_seconds + 's';
+          }
         }
       } catch (e) {
         console.error("Erro ao ler ROI:", e);
@@ -849,7 +1033,7 @@
         resizeCanvas();
         drawROI();
       } else {
-        btnToggle.innerText = '📐 Ajustar Caixa de Areia';
+        btnToggle.innerText = '📐 Ajustar Área de Interesse';
         btnSave.style.display = 'none';
         hint.style.display = 'none';
         canvas.style.display = 'none';
@@ -869,7 +1053,6 @@
       const w = canvas.width;
       const h = canvas.height;
 
-      // Desenhar polígono
       ctx.beginPath();
       polygon.forEach((p, idx) => {
         const x = p[0] * w;
@@ -884,7 +1067,6 @@
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Desenhar manipuladores (círculos)
       polygon.forEach((p, idx) => {
         const x = p[0] * w;
         const y = p[1] * h;
@@ -898,7 +1080,6 @@
       });
     }
 
-    // Interações de Mouse no Canvas
     canvas.addEventListener('mousedown', (e) => {
       const rect = canvas.getBoundingClientRect();
       const mx = (e.clientX - rect.left) / canvas.width;
@@ -907,9 +1088,7 @@
       activePointIndex = -1;
       polygon.forEach((p, idx) => {
         const dist = Math.hypot(p[0] - mx, p[1] - my);
-        if (dist < 0.05) { // sensibilidade de clique
-          activePointIndex = idx;
-        }
+        if (dist < 0.05) activePointIndex = idx;
       });
       drawROI();
     });
@@ -937,7 +1116,7 @@
           body: JSON.stringify({ polygon })
         });
         if (res.ok) {
-          alert('Área da caixa de areia atualizada com sucesso!');
+          alert('Área de interesse atualizada com sucesso!');
           toggleROIEditor();
         } else {
           alert('Erro ao salvar nova área.');
@@ -947,7 +1126,14 @@
       }
     }
 
-    // Inicialização
+    function onModeChange() {
+      const mode = document.getElementById('cfg-mode').value;
+      const colorSelect = document.getElementById('cfg-color');
+      if (mode === 'vehicles') {
+        colorSelect.parentElement.style.display = 'flex';
+      }
+    }
+
     window.addEventListener('load', () => {
       loadStatus();
       loadVisits();

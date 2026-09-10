@@ -22,6 +22,58 @@ RTSP_URL = "rtsp://localhost:8554/cat_cam"
 
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
+# Mapeamento de modos e classes do COCO Dataset
+MODE_CLASSES = {
+    "cat": [15],                     # Gato
+    "dog": [16],                     # Cachorro
+    "person": [0],                   # Pessoa
+    "vehicles": [2, 3, 5, 7],        # Carro, Moto, Ônibus, Caminhão
+    "all": None                      # Todas as classes
+}
+
+CLASS_NAMES_PT = {
+    0: "Pessoa",
+    1: "Bicicleta",
+    2: "Carro",
+    3: "Moto",
+    5: "Ônibus",
+    7: "Caminhão",
+    15: "Gato",
+    16: "Cachorro"
+}
+
+def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
+    """Verifica se o recorte do objeto detectado corresponde ao filtro de cor desejado."""
+    if color_filter == "none" or crop_bgr is None or crop_bgr.size == 0:
+        return True
+    
+    try:
+        hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
+        total_pixels = crop_bgr.shape[0] * crop_bgr.shape[1]
+        if total_pixels == 0:
+            return True
+
+        if color_filter == "white":
+            # Branco: Saturação baixa (< 55) e alto brilho (> 160)
+            mask = cv2.inRange(hsv, np.array([0, 0, 160]), np.array([180, 55, 255]))
+            return (np.sum(mask > 0) / total_pixels) > 0.25
+
+        elif color_filter == "black":
+            # Preto: Brilho muito baixo (< 65)
+            mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([180, 255, 65]))
+            return (np.sum(mask > 0) / total_pixels) > 0.25
+
+        elif color_filter == "red":
+            # Vermelho: dois intervalos no HSV (0-10 e 170-180)
+            mask1 = cv2.inRange(hsv, np.array([0, 80, 80]), np.array([10, 255, 255]))
+            mask2 = cv2.inRange(hsv, np.array([170, 80, 80]), np.array([180, 255, 255]))
+            mask = mask1 | mask2
+            return (np.sum(mask > 0) / total_pixels) > 0.20
+    except Exception:
+        pass
+    return True
+
+
 class FreshFrameReader(threading.Thread):
     """
     Thread dedicada para ler o stream RTSP continuamente e descartar o buffer atrasado.
@@ -84,9 +136,12 @@ class CatCamDetector:
         self.polygon_normalized = []
         self.confidence_threshold = 0.45
         self.debounce_seconds = 5
+        self.target_fps = 15
+        self.target_mode = "cat"
+        self.color_filter = "none"
         self.current_frame_shape = None
         
-        # Estado de visita
+        # Estado de visita/permanência
         self.is_visiting = False
         self.visit_start_time = None
         self.last_seen_inside_time = 0
@@ -96,8 +151,13 @@ class CatCamDetector:
         # Telemetria ao vivo
         self.status: Dict[str, Any] = {
             "camera_online": False,
-            "cat_detected": False,
-            "cat_in_litterbox": False,
+            "target_mode": "cat",
+            "color_filter": "none",
+            "target_fps": 15,
+            "detected_count": 0,
+            "in_zone_count": 0,
+            "object_detected": False,
+            "object_in_zone": False,
             "is_visiting": False,
             "visit_duration": 0,
             "last_event_time": None,
@@ -120,23 +180,48 @@ class CatCamDetector:
                     self.polygon_normalized = data.get("polygon", [[0.2, 0.3], [0.8, 0.3], [0.8, 0.85], [0.2, 0.85]])
                     self.confidence_threshold = data.get("confidence_threshold", 0.45)
                     self.debounce_seconds = data.get("debounce_seconds", 5)
+                    self.target_fps = data.get("target_fps", 15)
+                    self.target_mode = data.get("target_mode", "cat")
+                    self.color_filter = data.get("color_filter", "none")
+                    self.status["target_mode"] = self.target_mode
+                    self.status["color_filter"] = self.color_filter
+                    self.status["target_fps"] = self.target_fps
             self._update_zone()
         except Exception as e:
             print(f"[Detector] Erro ao carregar config ROI: {e}")
 
-    def save_roi_config(self, polygon: List[List[float]], confidence: Optional[float] = None, debounce: Optional[int] = None):
-        data = {
-            "polygon": polygon,
-            "confidence_threshold": confidence if confidence is not None else self.confidence_threshold,
-            "debounce_seconds": debounce if debounce is not None else self.debounce_seconds
-        }
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        self.polygon_normalized = polygon
+    def save_roi_config(self, polygon: Optional[List[List[float]]] = None, 
+                        confidence: Optional[float] = None, 
+                        debounce: Optional[int] = None,
+                        target_fps: Optional[int] = None,
+                        target_mode: Optional[str] = None,
+                        color_filter: Optional[str] = None):
+        if polygon is not None:
+            self.polygon_normalized = polygon
         if confidence is not None:
             self.confidence_threshold = confidence
         if debounce is not None:
             self.debounce_seconds = debounce
+        if target_fps is not None:
+            self.target_fps = max(1, min(30, target_fps))
+            self.status["target_fps"] = self.target_fps
+        if target_mode is not None:
+            self.target_mode = target_mode
+            self.status["target_mode"] = self.target_mode
+        if color_filter is not None:
+            self.color_filter = color_filter
+            self.status["color_filter"] = self.color_filter
+
+        data = {
+            "polygon": self.polygon_normalized,
+            "confidence_threshold": self.confidence_threshold,
+            "debounce_seconds": self.debounce_seconds,
+            "target_fps": self.target_fps,
+            "target_mode": self.target_mode,
+            "color_filter": self.color_filter
+        }
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
         self._update_zone()
 
     def _update_zone(self):
@@ -160,15 +245,16 @@ class CatCamDetector:
         self.running = True
         self.worker_thread = threading.Thread(target=self._run_loop, daemon=True)
         self.worker_thread.start()
-        print("[Detector] Worker de detecção iniciado com sucesso!")
+        print(f"[Detector] Worker iniciado a {self.target_fps} FPS no modo '{self.target_mode}'!")
 
     def _run_loop(self):
         fps_monitor = sv.FPSMonitor()
         last_process_time = time.time()
         
         while self.running:
-            # Cadência econômica: 2 FPS (processa 1 frame a cada ~500ms)
-            time_to_wait = 0.5 - (time.time() - last_process_time)
+            # Cadência configurável (ex: 15 FPS -> ~66ms entre frames)
+            target_delay = 1.0 / max(1, self.target_fps)
+            time_to_wait = target_delay - (time.time() - last_process_time)
             if time_to_wait > 0:
                 time.sleep(time_to_wait)
             last_process_time = time.time()
@@ -180,7 +266,7 @@ class CatCamDetector:
 
             self.status["camera_online"] = True
             
-            # Redimensiona para resolução ideal de inferência (640px de largura)
+            # Redimensiona para resolução de inferência (640px)
             orig_h, orig_w = raw_frame.shape[:2]
             scale = 640.0 / orig_w
             infer_w = 640
@@ -194,11 +280,13 @@ class CatCamDetector:
             fps_monitor.tick()
             self.status["fps"] = round(fps_monitor.fps, 1)
 
+            # Define as classes de interesse de acordo com o modo
+            target_classes = MODE_CLASSES.get(self.target_mode, [15])
+
             t0 = time.time()
-            # Inferência filtrando estritamente class 15 ('cat')
             results = self.model.predict(
                 frame,
-                classes=[15],
+                classes=target_classes,
                 conf=self.confidence_threshold,
                 device="cpu",
                 verbose=False
@@ -206,44 +294,63 @@ class CatCamDetector:
             self.status["inference_ms"] = round((time.time() - t0) * 1000, 1)
 
             detections = sv.Detections.from_ultralytics(results)
+
+            # Filtro opcional de cor (ex: carros brancos)
+            if self.color_filter != "none" and len(detections) > 0:
+                keep_indices = []
+                for idx, box in enumerate(detections.xyxy):
+                    x1, y1, x2, y2 = map(int, box)
+                    x1, y1 = max(0, x1), max(0, y1)
+                    x2, y2 = min(infer_w, x2), min(infer_h, y2)
+                    crop = frame[y1:y2, x1:x2]
+                    if is_matching_color(crop, self.color_filter):
+                        keep_indices.append(idx)
+                detections = detections[np.array(keep_indices, dtype=int)] if len(keep_indices) > 0 else sv.Detections.empty()
+
             detections = self.tracker.update_with_detections(detections)
 
-            cat_detected = len(detections) > 0
-            self.status["cat_detected"] = cat_detected
+            obj_count = len(detections)
+            self.status["detected_count"] = obj_count
+            self.status["object_detected"] = obj_count > 0
 
-            cat_in_zone = False
-            if self.zone is not None and cat_detected:
+            in_zone_count = 0
+            obj_in_zone = False
+            if self.zone is not None and obj_count > 0:
                 is_inside = self.zone.trigger(detections=detections)
-                cat_in_zone = any(is_inside)
+                in_zone_count = int(np.sum(is_inside))
+                obj_in_zone = in_zone_count > 0
 
-            self.status["cat_in_litterbox"] = cat_in_zone
+            self.status["in_zone_count"] = in_zone_count
+            self.status["object_in_zone"] = obj_in_zone
+            self.status["cat_in_litterbox"] = obj_in_zone # compatibilidade
 
-            # Gestão do Evento de Visita
+            # Gestão do Evento de Visita / Presença
             now = datetime.now()
             now_ts = time.time()
 
-            if cat_in_zone:
+            if obj_in_zone:
                 self.last_seen_inside_time = now_ts
                 if not self.is_visiting:
                     self.is_visiting = True
                     self.visit_start_time = now
-                    self.current_video_filename = f"visita_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
+                    self.current_video_filename = f"evento_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
                     video_filepath = os.path.join(RECORDINGS_DIR, self.current_video_filename)
                     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                    self.current_video_writer = cv2.VideoWriter(video_filepath, fourcc, 2.0, (infer_w, infer_h))
-                    print(f"[Detector] Nova visita iniciada em {now.strftime('%H:%M:%S')} - Gravando clipe...")
+                    # Grava no FPS alvo para fluidez natural
+                    self.current_video_writer = cv2.VideoWriter(video_filepath, fourcc, float(self.target_fps), (infer_w, infer_h))
+                    print(f"[Detector] Evento iniciado em {now.strftime('%H:%M:%S')} - Gravando...")
 
             if self.is_visiting:
                 duration = int((now - self.visit_start_time).total_seconds())
                 self.status["is_visiting"] = True
                 self.status["visit_duration"] = duration
 
-                # Grava o frame no clipe
+                # Grava frame
                 if self.current_video_writer is not None:
                     self.current_video_writer.write(frame)
 
-                # Verifica o debounce de saída
-                if not cat_in_zone and (now_ts - self.last_seen_inside_time > self.debounce_seconds):
+                # Debounce de saída
+                if not obj_in_zone and (now_ts - self.last_seen_inside_time > self.debounce_seconds):
                     self.is_visiting = False
                     self.status["is_visiting"] = False
                     self.status["last_event_time"] = now.strftime("%H:%M:%S")
@@ -252,7 +359,6 @@ class CatCamDetector:
                         self.current_video_writer.release()
                         self.current_video_writer = None
 
-                    # Apenas salva visitas reais com pelo menos 3 segundos de permanência
                     if duration >= 3:
                         record_visit(
                             start_time=self.visit_start_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -260,27 +366,33 @@ class CatCamDetector:
                             duration_seconds=duration,
                             video_filename=self.current_video_filename
                         )
-                        print(f"[Detector] Visita concluída! Duração: {duration}s. Registro salvo no banco.")
+                        print(f"[Detector] Evento concluído ({duration}s). Salvo no banco de dados.")
                     else:
-                        # Descarta falsos disparos relâmpago
                         try:
                             os.remove(os.path.join(RECORDINGS_DIR, self.current_video_filename))
                         except Exception:
                             pass
-                        print(f"[Detector] Visita curta demais ({duration}s), clipe descartado.")
 
-            # Anotações visuais no frame para o feed
+            # Anotações Visuais
             annotated_frame = frame.copy()
             if self.zone_annotator and self.zone:
-                self.zone_annotator.color = sv.Color.from_hex("#EF4444") if cat_in_zone else sv.Color.from_hex("#10B981")
+                self.zone_annotator.color = sv.Color.from_hex("#EF4444") if obj_in_zone else sv.Color.from_hex("#10B981")
                 annotated_frame = self.zone_annotator.annotate(scene=annotated_frame)
-            if len(detections) > 0:
+
+            if obj_count > 0:
                 annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
-                labels = [f"Gata #{tid} ({conf:.0%})" for tid, conf in zip(detections.tracker_id, detections.confidence)]
+                
+                labels = []
+                for class_id, tracker_id, conf in zip(detections.class_id, detections.tracker_id, detections.confidence):
+                    name = CLASS_NAMES_PT.get(int(class_id), f"ID:{class_id}")
+                    if tracker_id is not None:
+                        labels.append(f"{name} #{tracker_id} ({conf:.0%})")
+                    else:
+                        labels.append(f"{name} ({conf:.0%})")
+
                 annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
                 annotated_frame = self.trace_annotator.annotate(scene=annotated_frame, detections=detections)
 
-            # Codifica em JPEG para o feed web
             ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
             if ret_jpg:
                 with self.lock:
@@ -297,16 +409,15 @@ class CatCamDetector:
         self.reader.stop()
 
 
-# Instância global singleton do Detector
+# Instância global
 detector = CatCamDetector()
 
 if __name__ == "__main__":
     detector.start()
-    print("Detector rodando no terminal para teste... Pressione Ctrl+C para sair.")
+    print("Detector iniciado. Pressione Ctrl+C para sair.")
     try:
         while True:
             time.sleep(2)
-            print(f"[Status] Câmera: {detector.status['camera_online']} | Gato detectado: {detector.status['cat_detected']} | Na caixa: {detector.status['cat_in_litterbox']} | FPS: {detector.status['fps']} | Latência: {detector.status['inference_ms']}ms")
+            print(f"[Status] Câmera: {detector.status['camera_online']} | FPS: {detector.status['fps']} | Objetos: {detector.status['detected_count']} | Na Zona: {detector.status['in_zone_count']}")
     except KeyboardInterrupt:
         detector.stop()
-        print("Detector finalizado.")
