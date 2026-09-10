@@ -697,13 +697,14 @@
               <tr>
                 <th>Início</th>
                 <th>Término</th>
+                <th>Identificação</th>
                 <th>Duração</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody id="visits-tbody">
               <tr>
-                <td colspan="4" class="empty-state">Carregando registros...</td>
+                <td colspan="5" class="empty-state">Carregando registros...</td>
               </tr>
             </tbody>
           </table>
@@ -738,7 +739,9 @@
         <div class="form-group">
           <label class="form-label">O que a IA deve buscar:</label>
           <select id="cfg-mode" class="form-select" onchange="onModeChange()">
-            <option value="cat">🐱 Gatos (Monitor de Pet / Caixa de Areia)</option>
+            <option value="cat">🐱 Gatos (Beatriz ou Serena - Qualquer cor)</option>
+            <option value="cat_beatriz">🧡 Apenas Beatriz (Gata Amarela / Laranja)</option>
+            <option value="cat_serena">🩶 Apenas Serena (Gata Cinza)</option>
             <option value="vehicles">🚗 Carros & Veículos (Trânsito / Rua)</option>
             <option value="person">👤 Pessoas (Segurança / Entrada)</option>
             <option value="dog">🐶 Cachorros</option>
@@ -855,6 +858,61 @@
       }
     }
 
+    let trackedBoxes = [];
+
+    function updateTrackedBoxes(newObjects) {
+      const now = performance.now();
+      if (!newObjects || newObjects.length === 0) return;
+
+      newObjects.forEach((obj, idx) => {
+        const [ox1, oy1, ox2, oy2] = obj.box;
+        const ocx = (ox1 + ox2) / 2;
+        const ocy = (oy1 + oy2) / 2;
+
+        let bestMatch = null;
+        let bestDist = 0.22;
+
+        for (const tb of trackedBoxes) {
+          const tcx = (tb.tx1 + tb.tx2) / 2;
+          const tcy = (tb.ty1 + tb.ty2) / 2;
+          const dist = Math.hypot(ocx - tcx, ocy - tcy);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestMatch = tb;
+          }
+        }
+
+        if (bestMatch) {
+          bestMatch.tx1 = ox1;
+          bestMatch.ty1 = oy1;
+          bestMatch.tx2 = ox2;
+          bestMatch.ty2 = oy2;
+          bestMatch.label = obj.label;
+          bestMatch.name = obj.name || obj.label;
+          bestMatch.conf = obj.conf;
+          bestMatch.in_zone = obj.in_zone;
+          bestMatch.lastSeen = now;
+        } else {
+          trackedBoxes.push({
+            id: obj.id !== undefined ? obj.id : `b_${now}_${idx}`,
+            x1: ox1,
+            y1: oy1,
+            x2: ox2,
+            y2: oy2,
+            tx1: ox1,
+            ty1: oy1,
+            tx2: ox2,
+            ty2: oy2,
+            label: obj.label,
+            name: obj.name || obj.label,
+            conf: obj.conf,
+            in_zone: obj.in_zone,
+            lastSeen: now
+          });
+        }
+      });
+    }
+
     let wsDetections = null;
     function connectDetectionWS() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -867,6 +925,7 @@
           try {
             const data = JSON.parse(e.data);
             currentDetections = data;
+            if (data.objects) updateTrackedBoxes(data.objects);
             if (data.polygon && !roiEditing) {
               polygon = data.polygon;
             }
@@ -891,6 +950,7 @@
           if (res.ok) {
             const data = await res.json();
             currentDetections = data;
+            if (data.objects) updateTrackedBoxes(data.objects);
             if (data.polygon && !roiEditing) {
               polygon = data.polygon;
             }
@@ -920,7 +980,7 @@
         const poly = currentDetections.polygon || polygon;
         const inZone = currentDetections.in_zone;
 
-        // 1. Desenha a Área de Interesse (ROI)
+        // 1. Desenha a Área de Interesse (ROI) - Linhas limpas sem máscara
         if (poly && poly.length >= 3) {
           aiCtx.save();
           aiCtx.beginPath();
@@ -969,56 +1029,80 @@
           aiCtx.restore();
         }
 
-        // 2. Desenha Bounding Boxes e Labels de cada objeto detectado
-        if (currentDetections.objects && currentDetections.objects.length > 0) {
-          currentDetections.objects.forEach(obj => {
-            const [x1, y1, x2, y2] = obj.box;
-            const bx = x1 * w;
-            const by = y1 * h;
-            const bw = (x2 - x1) * w;
-            const bh = (y2 - y1) * h;
+        // 2. Desenha Bounding Boxes com Interpolação Contínua e Anti-Flicker (Lerp 60 FPS)
+        const now = performance.now();
+        trackedBoxes = trackedBoxes.filter(tb => (now - tb.lastSeen) < 700);
 
-            if (bw <= 0 || bh <= 0) return;
+        trackedBoxes.forEach(box => {
+          // Interpolação linear suave (Lerp)
+          box.x1 += (box.tx1 - box.x1) * 0.35;
+          box.y1 += (box.ty1 - box.y1) * 0.35;
+          box.x2 += (box.tx2 - box.x2) * 0.35;
+          box.y2 += (box.ty2 - box.y2) * 0.35;
 
-            aiCtx.save();
-            const color = obj.in_zone ? '#EF4444' : '#6366F1';
-            aiCtx.strokeStyle = color;
-            aiCtx.lineWidth = 2.5;
-            aiCtx.shadowColor = color;
-            aiCtx.shadowBlur = 8;
+          const age = now - box.lastSeen;
+          const alpha = age > 350 ? Math.max(0.08, 1 - (age - 350) / 350) : 1.0;
 
-            // Retângulo arredondado para o objeto
-            aiCtx.beginPath();
-            if (aiCtx.roundRect) {
-              aiCtx.roundRect(bx, by, bw, bh, 6);
-            } else {
-              aiCtx.rect(bx, by, bw, bh);
-            }
-            aiCtx.stroke();
+          const bx = box.x1 * w;
+          const by = box.y1 * h;
+          const bw = (box.x2 - box.x1) * w;
+          const bh = (box.y2 - box.y1) * h;
 
-            // Etiqueta com nome e acurácia (%)
-            aiCtx.shadowBlur = 0;
-            const labelText = `${obj.label} (${Math.round(obj.conf * 100)}%)`;
-            aiCtx.font = '600 12px Outfit, sans-serif';
-            const lw = aiCtx.measureText(labelText).width;
-            const lh = 22;
-            const lx = bx;
-            const ly = Math.max(lh + 4, by);
+          if (bw <= 8 || bh <= 8) return;
 
-            aiCtx.fillStyle = obj.in_zone ? 'rgba(239, 68, 68, 0.95)' : 'rgba(99, 102, 241, 0.95)';
-            aiCtx.beginPath();
-            if (aiCtx.roundRect) {
-              aiCtx.roundRect(lx, ly - lh, lw + 14, lh, [4, 4, 0, 0]);
-            } else {
-              aiCtx.rect(lx, ly - lh, lw + 14, lh);
-            }
-            aiCtx.fill();
+          aiCtx.save();
+          aiCtx.globalAlpha = alpha;
 
-            aiCtx.fillStyle = '#FFFFFF';
-            aiCtx.fillText(labelText, lx + 7, ly - 6);
-            aiCtx.restore();
-          });
-        }
+          let strokeColor = '#6366F1';
+          let badgeBg = 'rgba(99, 102, 241, 0.95)';
+
+          if (box.in_zone) {
+            strokeColor = '#EF4444';
+            badgeBg = 'rgba(239, 68, 68, 0.95)';
+          } else if (box.name && box.name.includes('Beatriz')) {
+            strokeColor = '#F97316';
+            badgeBg = 'rgba(249, 115, 22, 0.95)';
+          } else if (box.name && box.name.includes('Serena')) {
+            strokeColor = '#94A3B8';
+            badgeBg = 'rgba(71, 85, 105, 0.95)';
+          }
+
+          aiCtx.strokeStyle = strokeColor;
+          aiCtx.lineWidth = 2.5;
+          aiCtx.shadowColor = strokeColor;
+          aiCtx.shadowBlur = 8;
+
+          aiCtx.beginPath();
+          if (aiCtx.roundRect) {
+            aiCtx.roundRect(bx, by, bw, bh, 6);
+          } else {
+            aiCtx.rect(bx, by, bw, bh);
+          }
+          aiCtx.stroke();
+
+          // Etiqueta com nome e acurácia (%)
+          aiCtx.shadowBlur = 0;
+          const confPct = Math.round((box.conf || 0.8) * 100);
+          const labelText = `${box.label} (${confPct}%)`;
+          aiCtx.font = '600 12px Outfit, sans-serif';
+          const lw = aiCtx.measureText(labelText).width;
+          const lh = 22;
+          const lx = bx;
+          const ly = Math.max(lh + 4, by);
+
+          aiCtx.fillStyle = badgeBg;
+          aiCtx.beginPath();
+          if (aiCtx.roundRect) {
+            aiCtx.roundRect(lx, ly - lh, lw + 14, lh, [4, 4, 0, 0]);
+          } else {
+            aiCtx.rect(lx, ly - lh, lw + 14, lh);
+          }
+          aiCtx.fill();
+
+          aiCtx.fillStyle = '#FFFFFF';
+          aiCtx.fillText(labelText, lx + 7, ly - 6);
+          aiCtx.restore();
+        });
       }
 
       requestAnimationFrame(renderAIOverlay);
@@ -1086,7 +1170,7 @@
         
         const tbody = document.getElementById('visits-tbody');
         if (!visits || visits.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhum evento registrado neste período.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Nenhum evento registrado neste período.</td></tr>';
           return;
         }
 
@@ -1095,6 +1179,20 @@
           const endTime = v.end_time.split(' ')[1] || v.end_time;
           const dateStr = v.start_time.split(' ')[0] || '';
           
+          let visitorBadge = '🐱 Gato';
+          const vName = v.visitor_name || 'Gato';
+          if (vName.includes('Ambos')) {
+            visitorBadge = '<span style="color: #F59E0B; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🐾 Ambos</span>';
+          } else if (vName.includes('Beatriz')) {
+            visitorBadge = '<span style="color: #FB923C; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🧡 Beatriz</span>';
+          } else if (vName.includes('Serena')) {
+            visitorBadge = '<span style="color: #94A3B8; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🩶 Serena</span>';
+          } else if (vName.includes('Noturno')) {
+            visitorBadge = '<span style="color: #64748B; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">🌙 Gato (P&B)</span>';
+          } else {
+            visitorBadge = `<span style="color: #CBD5E1;">${vName}</span>`;
+          }
+
           return `
             <tr>
               <td>
@@ -1102,6 +1200,7 @@
                 <div style="font-size: 11px; color: var(--text-muted);">${dateStr}</div>
               </td>
               <td>${endTime}</td>
+              <td>${visitorBadge}</td>
               <td>
                 <span class="duration-badge">⏱️ ${v.duration_seconds}s</span>
               </td>

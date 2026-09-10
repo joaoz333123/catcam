@@ -26,6 +26,8 @@ os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
 MODE_CLASSES = {
     "cat": [15],
+    "cat_beatriz": [15],
+    "cat_serena": [15],
     "dog": [16],
     "person": [0],
     "vehicles": [2, 3, 5, 7],
@@ -42,6 +44,45 @@ CLASS_NAMES_PT = {
     15: "Gato",
     16: "Cachorro"
 }
+
+def identify_cat_individual(crop_bgr: np.ndarray, full_frame_bgr: Optional[np.ndarray] = None) -> str:
+    """
+    Identifica se o gato recortado é a Beatriz (Amarela/Laranja) ou a Serena (Cinza).
+    Se a câmera estiver em visão noturna (infravermelho monocromático), informa 'Gato (Noturno)'.
+    """
+    if crop_bgr is None or crop_bgr.size == 0:
+        return "Gato"
+
+    # Verifica se a imagem geral da câmera está em infravermelho (monocromática)
+    if full_frame_bgr is not None and full_frame_bgr.size > 0:
+        b, g, r = cv2.split(full_frame_bgr)
+        diff_rg = np.mean(cv2.absdiff(r, g))
+        diff_gb = np.mean(cv2.absdiff(g, b))
+        if diff_rg < 4.0 and diff_gb < 4.0:
+            return "Gato (Noturno)"
+
+    try:
+        hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
+        total_pixels = crop_bgr.shape[0] * crop_bgr.shape[1]
+        if total_pixels == 0:
+            return "Gato"
+
+        # Beatriz: Amarelo / Laranja / Ruivo (Hue 8-36, Sat > 38, Val > 45)
+        yellow_mask = cv2.inRange(hsv, np.array([8, 38, 45]), np.array([36, 255, 255]))
+        yellow_pct = np.sum(yellow_mask > 0) / total_pixels
+
+        # Serena: Cinza (baixa saturação Sat < 40, Val 35-215)
+        gray_mask = cv2.inRange(hsv, np.array([0, 0, 35]), np.array([180, 40, 215]))
+        gray_pct = np.sum(gray_mask > 0) / total_pixels
+
+        if yellow_pct > 0.12:
+            return "Beatriz (Amarela)"
+        elif gray_pct > 0.20 and yellow_pct < 0.08:
+            return "Serena (Cinza)"
+        else:
+            return "Beatriz (Amarela)" if yellow_pct > 0.06 else "Serena (Cinza)"
+    except Exception:
+        return "Gato"
 
 def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
     if color_filter == "none" or crop_bgr is None or crop_bgr.size == 0:
@@ -178,6 +219,7 @@ class CatCamDetector:
         self.last_seen_inside_time = 0
         self.current_video_writer = None
         self.current_video_filename = None
+        self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
         
         # Telemetria ao vivo
         self.status: Dict[str, Any] = {
@@ -370,6 +412,7 @@ class CatCamDetector:
                 if not self.is_visiting:
                     self.is_visiting = True
                     self.visit_start_time = now
+                    self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
                     self.current_video_filename = f"evento_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
                     video_filepath = os.path.join(RECORDINGS_DIR, self.current_video_filename)
                     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -393,16 +436,36 @@ class CatCamDetector:
                         self.current_video_writer.release()
                         self.current_video_writer = None
 
+                    b_count = self.visit_cat_counts.get("Beatriz", 0)
+                    s_count = self.visit_cat_counts.get("Serena", 0)
+                    n_count = self.visit_cat_counts.get("Noturno", 0)
+
+                    if b_count >= 5 and s_count >= 5 and (min(b_count, s_count) / max(1, max(b_count, s_count)) > 0.25):
+                        visitor_name = "Ambos (Beatriz & Serena)"
+                    elif b_count > s_count and b_count >= 2:
+                        visitor_name = "Beatriz (Amarela)"
+                    elif s_count > b_count and s_count >= 2:
+                        visitor_name = "Serena (Cinza)"
+                    elif n_count > 0:
+                        visitor_name = "Gato (Visão Noturna)"
+                    elif self.target_mode == "vehicles":
+                        visitor_name = "Veículo"
+                    elif self.target_mode == "person":
+                        visitor_name = "Pessoa"
+                    else:
+                        visitor_name = "Gato"
+
                     if duration >= 3:
                         record_visit(
                             start_time=self.visit_start_time.strftime("%Y-%m-%d %H:%M:%S"),
                             end_time=now.strftime("%Y-%m-%d %H:%M:%S"),
                             duration_seconds=duration,
-                            video_filename=self.current_video_filename
+                            video_filename=self.current_video_filename,
+                            visitor_name=visitor_name
                         )
                         full_video_path = os.path.join(RECORDINGS_DIR, self.current_video_filename)
                         convert_video_to_h264(full_video_path)
-                        print(f"[Detector] Evento concluído ({duration}s). Salvo e disparada conversão H.264 Web.")
+                        print(f"[Detector] Evento concluído ({duration}s - {visitor_name}). Salvo e disparada conversão H.264 Web.")
                     else:
                         try:
                             os.remove(os.path.join(RECORDINGS_DIR, self.current_video_filename))
@@ -431,6 +494,7 @@ class CatCamDetector:
 
             # Extrai payload de detecção estruturado para o Overlay WebRTC em tempo real
             objects_payload = []
+            current_frame_cats = []
             if obj_count > 0:
                 is_inside_list = self.zone.trigger(detections=detections) if self.zone is not None else [False] * obj_count
                 for idx, (box, class_id, conf) in enumerate(zip(detections.xyxy, detections.class_id, detections.confidence)):
@@ -440,16 +504,43 @@ class CatCamDetector:
                     x2_n = round(float(box[2]) / infer_w, 4)
                     y2_n = round(float(box[3]) / infer_h, 4)
                     c_id = int(class_id)
-                    name = CLASS_NAMES_PT.get(c_id, f"ID:{c_id}")
                     inside = bool(is_inside_list[idx]) if idx < len(is_inside_list) else False
 
+                    # Se for gato (15), identifica individualmente Beatriz (amarela) ou Serena (cinza)
+                    if c_id == 15:
+                        x1_p, y1_p = max(0, int(box[0])), max(0, int(box[1]))
+                        x2_p, y2_p = min(infer_w, int(box[2])), min(infer_h, int(box[3]))
+                        cat_crop = frame[y1_p:y2_p, x1_p:x2_p]
+                        cat_identity = identify_cat_individual(cat_crop, raw_frame)
+                        current_frame_cats.append(cat_identity)
+
+                        if self.target_mode == "cat_beatriz" and "Beatriz" not in cat_identity:
+                            continue
+                        if self.target_mode == "cat_serena" and "Serena" not in cat_identity:
+                            continue
+
+                        name = cat_identity
+                    else:
+                        name = CLASS_NAMES_PT.get(c_id, f"ID:{c_id}")
+
                     objects_payload.append({
+                        "id": tracker_id if tracker_id is not None else idx,
                         "box": [x1_n, y1_n, x2_n, y2_n],
                         "class_id": c_id,
                         "label": f"{name} #{tracker_id}" if tracker_id is not None else name,
+                        "name": name,
                         "conf": round(float(conf), 2),
                         "in_zone": inside
                     })
+
+            if self.is_visiting and obj_in_zone:
+                for c_name in current_frame_cats:
+                    if "Beatriz" in c_name:
+                        self.visit_cat_counts["Beatriz"] += 1
+                    elif "Serena" in c_name:
+                        self.visit_cat_counts["Serena"] += 1
+                    elif "Noturno" in c_name:
+                        self.visit_cat_counts["Noturno"] += 1
 
             # Codifica com otimização rápida
             ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])

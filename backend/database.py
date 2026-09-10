@@ -22,19 +22,24 @@ def init_db():
             duration_seconds INTEGER NOT NULL,
             video_filename TEXT,
             tracker_id INTEGER,
+            visitor_name TEXT DEFAULT 'Gato',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    try:
+        cursor.execute("ALTER TABLE visits ADD COLUMN visitor_name TEXT DEFAULT 'Gato'")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
-def record_visit(start_time: str, end_time: str, duration_seconds: int, video_filename: Optional[str] = None, tracker_id: Optional[int] = None) -> int:
+def record_visit(start_time: str, end_time: str, duration_seconds: int, video_filename: Optional[str] = None, tracker_id: Optional[int] = None, visitor_name: str = "Gato") -> int:
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO visits (start_time, end_time, duration_seconds, video_filename, tracker_id)
-        VALUES (?, ?, ?, ?, ?)
-    """, (start_time, end_time, duration_seconds, video_filename, tracker_id))
+        INSERT INTO visits (start_time, end_time, duration_seconds, video_filename, tracker_id, visitor_name)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (start_time, end_time, duration_seconds, video_filename, tracker_id, visitor_name))
     visit_id = cursor.lastrowid
     conn.commit()
     conn.close()

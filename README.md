@@ -18,10 +18,14 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
   - `ByteTrack`: Rastreamento contínuo com ID estável para evitar contagens duplicadas.
   - `TraceAnnotator` & `BoxAnnotator`: Rastro de movimento e enquadramento visual.
 - **Multi-Modos de Detecção Selecionáveis:**
-  - 🐱 **Gatos:** Monitoramento de pets e uso de caixa de areia.
+  - 🐱 **Gatos (Todos):** Monitoramento e identificação cromática individual.
+  - 🧡 **Apenas Beatriz:** Filtra e registra apenas a gata amarela/laranja.
+  - 🩶 **Apenas Serena:** Filtra e registra apenas a gata cinza.
   - 🚗 **Veículos:** Contagem de trânsito (carros, motos, ônibus e caminhões).
   - 👤 **Pessoas:** Segurança e monitoramento de passagens.
   - 🐶 **Cachorros** e todas as 80 classes do COCO Dataset.
+- **Identificação Individual de Pets (Beatriz vs. Serena):** Reconhecimento cromático em tempo real via análise HSV que identifica quem visitou a área demarcada e grava no histórico (**Beatriz**, **Serena** ou **Ambos**).
+- **Rastreamento Anti-Flicker com Interpolação Lerp:** Elimina caixas piscando ou sumindo entre frames; a caixa acompanha o animal com deslizamento contínuo a 60 FPS e persistência de 650ms.
 - **Filtro de Cor Integrado:** Possibilidade de filtrar objetos por cor (ex: detectar e contar **apenas carros brancos**).
 - **Taxa de Quadros Ajustável (FPS):** Controle dinâmico de 2 FPS (máxima economia) até 25 FPS (rastreamento ultra fluido).
 - **Buffer de Suavização (Jitter Buffer):** Armazena uma fila contínua de quadros na memória com cadência uniforme para gravações de clipes e compatibilidade de feed.
