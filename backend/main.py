@@ -37,6 +37,9 @@ class ROIUpdateRequest(BaseModel):
     target_fps: Optional[int] = None
     target_mode: Optional[str] = None
     color_filter: Optional[str] = None
+    target_cats: Optional[List[str]] = None
+    target_presets: Optional[List[str]] = None
+    extra_classes: Optional[List[int]] = None
 
 @app.on_event("startup")
 def startup_event():
@@ -92,7 +95,10 @@ def update_roi(payload: ROIUpdateRequest):
             debounce=payload.debounce_seconds,
             target_fps=payload.target_fps,
             target_mode=payload.target_mode,
-            color_filter=payload.color_filter
+            color_filter=payload.color_filter,
+            target_cats=payload.target_cats,
+            target_presets=payload.target_presets,
+            extra_classes=payload.extra_classes
         )
         return {"status": "success", "message": "Configurações atualizadas com sucesso!"}
     except Exception as e:

@@ -742,6 +742,84 @@
       min-width: 50px;
       font-size: 14px;
     }
+
+    /* Grade de Checkboxes de Alvos */
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    @media (max-width: 500px) {
+      .checkbox-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .checkbox-label:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      accent-color: var(--accent-primary);
+      width: 17px;
+      height: 17px;
+      cursor: pointer;
+    }
+
+    /* Tags de Multi-Seleção de Classes Extras */
+    .multi-select-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+      min-height: 28px;
+    }
+
+    .class-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(99, 102, 241, 0.18);
+      border: 1px solid rgba(99, 102, 241, 0.38);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #E0E7FF;
+      transition: all 0.2s ease;
+    }
+
+    .class-tag-remove {
+      cursor: pointer;
+      color: #F87171;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1;
+      margin-left: 2px;
+    }
+
+    .class-tag-remove:hover {
+      color: #EF4444;
+      transform: scale(1.2);
+    }
   </style>
 </head>
 <body>
@@ -869,23 +947,52 @@
         </div>
         
         <div class="settings-grid" style="grid-template-columns: 1fr;">
-          <!-- Modo de Detecção -->
+          <!-- Alvos Rápidos em Checkboxes -->
           <div class="form-group">
-            <label class="form-label">O que a IA deve buscar:</label>
-            <select id="cfg-mode" class="form-select" onchange="onModeChange(); triggerAutoSave();">
-              <option value="cat">🐱 Gatos (Beatriz ou Serena - Qualquer cor)</option>
-              <option value="cat_beatriz">🧡 Apenas Beatriz (Gata Amarela / Laranja)</option>
-              <option value="cat_serena">🩶 Apenas Serena (Gata Cinza)</option>
-              <option value="vehicles">🚗 Carros & Veículos (Trânsito / Rua)</option>
-              <option value="person">👤 Pessoas (Segurança / Entrada)</option>
-              <option value="dog">🐶 Cachorros</option>
-              <option value="all">🌐 Todos os 80 Objetos (COCO Dataset)</option>
-            </select>
+            <label class="form-label">Alvos de Detecção (Selecione um ou múltiplos):</label>
+            <div class="checkbox-grid">
+              <label class="checkbox-label">
+                <input type="checkbox" id="chk-beatriz" onchange="onTargetCheckChange()" checked>
+                <span>🧡 Beatriz (Amarela)</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chk-serena" onchange="onTargetCheckChange()" checked>
+                <span>🩶 Serena (Cinza)</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chk-cats-other" onchange="onTargetCheckChange()">
+                <span>🐱 Outro Gato</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chk-persons" onchange="onTargetCheckChange()">
+                <span>👤 Pessoas</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chk-vehicles" onchange="onTargetCheckChange()">
+                <span>🚗 Veículos</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chk-dogs" onchange="onTargetCheckChange()">
+                <span>🐶 Cachorros</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Itens Adicionais (80 Classes COCO) com Multi-Select -->
+          <div class="form-group">
+            <label class="form-label">Adicionar Outros Itens à Busca (COCO Dataset):</label>
+            <div style="display: flex; gap: 8px;">
+              <select id="cfg-extra-select" class="form-select" style="flex: 1;">
+                <option value="">-- Escolha um item para adicionar --</option>
+              </select>
+              <button class="btn btn-outline" type="button" onclick="addExtraClassFromSelect()">➕ Adicionar</button>
+            </div>
+            <div id="extra-classes-tags" class="multi-select-tags"></div>
           </div>
 
           <!-- Filtro Opcional de Cor -->
           <div class="form-group" id="group-color-filter" style="display: none;">
-            <label class="form-label">Filtro de Cor (Opcional):</label>
+            <label class="form-label">Filtro de Cor para Veículos (Opcional):</label>
             <select id="cfg-color" class="form-select" onchange="triggerAutoSave()">
               <option value="none">Qualquer Cor (Sem filtro)</option>
               <option value="white">⚪ Apenas Branco (ex: Carros Brancos)</option>
@@ -1525,6 +1632,83 @@
       modal.style.display = 'none';
     }
 
+    // Dicionário das 80 Classes COCO para o Multi-Select de busca
+    const COCO_CLASSES = {
+      0: "Pessoa", 1: "Bicicleta", 2: "Carro", 3: "Moto", 4: "Avião", 5: "Ônibus", 6: "Trem", 7: "Caminhão", 8: "Barco",
+      9: "Semáforo", 10: "Hidrante", 11: "Placa de Pare", 12: "Parquímetro", 13: "Banco", 14: "Pássaro", 15: "Gato",
+      16: "Cachorro", 17: "Cavalo", 18: "Ovelha", 19: "Vaca", 20: "Elefante", 21: "Urso", 22: "Zebra", 23: "Girafa",
+      24: "Mochila", 25: "Guarda-chuva", 26: "Bolsa", 27: "Gravata", 28: "Mala", 29: "Frisbee", 30: "Esqui",
+      31: "Snowboard", 32: "Bola de Esportes", 33: "Pipa", 34: "Taco de Beisebol", 35: "Luva de Beisebol",
+      36: "Skate", 37: "Prancha de Surfe", 38: "Raquete de Tênis", 39: "Garrafa", 40: "Taça de Vinho", 41: "Copo",
+      42: "Garfo", 43: "Faca", 44: "Colher", 45: "Tigela", 46: "Banana", 47: "Maçã", 48: "Sanduíche", 49: "Laranja",
+      50: "Brócolis", 51: "Cenoura", 52: "Cachorro-quente", 53: "Pizza", 54: "Donut", 55: "Bolo", 56: "Cadeira",
+      57: "Sofá", 58: "Planta em Vaso", 59: "Cama", 60: "Mesa de Jantar", 61: "Vaso Sanitário", 62: "TV / Monitor",
+      63: "Notebook", 64: "Mouse", 65: "Controle Remoto", 66: "Teclado", 67: "Celular", 68: "Micro-ondas",
+      69: "Forno", 70: "Torradeira", 71: "Pia", 72: "Geladeira", 73: "Livro", 74: "Relógio", 75: "Vaso",
+      76: "Tesoura", 77: "Urso de Pelúcia", 78: "Secador de Cabelo", 79: "Escova de Dentes"
+    };
+
+    let selectedExtraClasses = [];
+
+    function populateExtraClassesSelect() {
+      const sel = document.getElementById('cfg-extra-select');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- Escolha um item para adicionar --</option>';
+      const sorted = Object.entries(COCO_CLASSES).sort((a, b) => a[1].localeCompare(b[1]));
+      for (const [idStr, name] of sorted) {
+        const id = parseInt(idStr);
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${name} (COCO #${id})`;
+        sel.appendChild(opt);
+      }
+    }
+
+    function addExtraClassFromSelect() {
+      const sel = document.getElementById('cfg-extra-select');
+      if (!sel || !sel.value) return;
+      const classId = parseInt(sel.value);
+      if (!selectedExtraClasses.includes(classId)) {
+        selectedExtraClasses.push(classId);
+        renderExtraClassesTags();
+        triggerAutoSave();
+      }
+      sel.value = "";
+    }
+
+    function removeExtraClass(classId) {
+      selectedExtraClasses = selectedExtraClasses.filter(id => id !== classId);
+      renderExtraClassesTags();
+      triggerAutoSave();
+    }
+
+    function renderExtraClassesTags() {
+      const container = document.getElementById('extra-classes-tags');
+      if (!container) return;
+      if (selectedExtraClasses.length === 0) {
+        container.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Nenhum item adicional selecionado</span>';
+        return;
+      }
+      container.innerHTML = selectedExtraClasses.map(id => {
+        const name = COCO_CLASSES[id] || `Item #${id}`;
+        return `
+          <span class="class-tag">
+            ${name}
+            <span class="class-tag-remove" onclick="removeExtraClass(${id})" title="Remover">✕</span>
+          </span>
+        `;
+      }).join('');
+    }
+
+    function onTargetCheckChange() {
+      const chkVehicles = document.getElementById('chk-vehicles');
+      const groupColor = document.getElementById('group-color-filter');
+      if (groupColor && chkVehicles) {
+        groupColor.style.display = chkVehicles.checked ? 'flex' : 'none';
+      }
+      triggerAutoSave();
+    }
+
     // Auto-Save das Configurações da IA
     let autoSaveTimeout = null;
 
@@ -1542,8 +1726,25 @@
     }
 
     async function saveAISettingsDirect() {
-      const mode = document.getElementById('cfg-mode').value;
-      const color = document.getElementById('cfg-color').value;
+      const chkBeatriz = document.getElementById('chk-beatriz')?.checked ?? true;
+      const chkSerena = document.getElementById('chk-serena')?.checked ?? true;
+      const chkOther = document.getElementById('chk-cats-other')?.checked ?? false;
+      const chkPersons = document.getElementById('chk-persons')?.checked ?? false;
+      const chkVehicles = document.getElementById('chk-vehicles')?.checked ?? false;
+      const chkDogs = document.getElementById('chk-dogs')?.checked ?? false;
+
+      const target_cats = [];
+      if (chkBeatriz) target_cats.push("beatriz");
+      if (chkSerena) target_cats.push("serena");
+      if (chkOther) target_cats.push("other");
+
+      const target_presets = [];
+      if (target_cats.length > 0) target_presets.push("cats");
+      if (chkPersons) target_presets.push("persons");
+      if (chkVehicles) target_presets.push("vehicles");
+      if (chkDogs) target_presets.push("dogs");
+
+      const color = document.getElementById('cfg-color')?.value || "none";
       const fps = parseInt(document.getElementById('cfg-fps').value);
       const conf = parseFloat(document.getElementById('cfg-conf').value) / 100.0;
       const debounce = parseInt(document.getElementById('cfg-debounce').value);
@@ -1554,7 +1755,9 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            target_mode: mode,
+            target_cats: target_cats,
+            target_presets: target_presets,
+            extra_classes: selectedExtraClasses,
             color_filter: color,
             target_fps: fps,
             confidence_threshold: conf,
@@ -1590,10 +1793,22 @@
         if (res.ok) {
           const data = await res.json();
           if (data.polygon) polygon = data.polygon;
-          if (data.target_mode) {
-            document.getElementById('cfg-mode').value = data.target_mode;
-            onModeChange();
+          if (data.target_cats) {
+            document.getElementById('chk-beatriz').checked = data.target_cats.includes('beatriz');
+            document.getElementById('chk-serena').checked = data.target_cats.includes('serena');
+            document.getElementById('chk-cats-other').checked = data.target_cats.includes('other');
           }
+          if (data.target_presets) {
+            document.getElementById('chk-persons').checked = data.target_presets.includes('persons');
+            document.getElementById('chk-vehicles').checked = data.target_presets.includes('vehicles');
+            document.getElementById('chk-dogs').checked = data.target_presets.includes('dogs');
+          }
+          if (data.extra_classes) {
+            selectedExtraClasses = data.extra_classes;
+            renderExtraClassesTags();
+          }
+          onTargetCheckChange();
+
           if (data.color_filter) document.getElementById('cfg-color').value = data.color_filter;
           if (data.target_fps) {
             document.getElementById('cfg-fps').value = data.target_fps;
@@ -1719,15 +1934,8 @@
       }
     }
 
-    function onModeChange() {
-      const mode = document.getElementById('cfg-mode').value;
-      const groupColor = document.getElementById('group-color-filter');
-      if (groupColor) {
-        groupColor.style.display = (mode === 'vehicles') ? 'flex' : 'none';
-      }
-    }
-
     window.addEventListener('load', () => {
+      populateExtraClassesSelect();
       loadStatus();
       loadVisits();
       loadROIConfig();

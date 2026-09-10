@@ -21,5 +21,17 @@
   "debounce_seconds": 10,
   "target_fps": 25,
   "target_mode": "cat",
-  "color_filter": "none"
+  "color_filter": "none",
+  "target_cats": [
+    "beatriz",
+    "serena"
+  ],
+  "target_presets": [
+    "cats",
+    "persons"
+  ],
+  "extra_classes": [
+    5,
+    2
+  ]
 }

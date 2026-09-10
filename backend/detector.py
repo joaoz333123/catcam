@@ -35,14 +35,18 @@ MODE_CLASSES = {
 }
 
 CLASS_NAMES_PT = {
-    0: "Pessoa",
-    1: "Bicicleta",
-    2: "Carro",
-    3: "Moto",
-    5: "Ônibus",
-    7: "Caminhão",
-    15: "Gato",
-    16: "Cachorro"
+    0: "Pessoa", 1: "Bicicleta", 2: "Carro", 3: "Moto", 4: "Avião", 5: "Ônibus", 6: "Trem", 7: "Caminhão", 8: "Barco",
+    9: "Semáforo", 10: "Hidrante", 11: "Placa de Pare", 12: "Parquímetro", 13: "Banco", 14: "Pássaro", 15: "Gato",
+    16: "Cachorro", 17: "Cavalo", 18: "Ovelha", 19: "Vaca", 20: "Elefante", 21: "Urso", 22: "Zebra", 23: "Girafa",
+    24: "Mochila", 25: "Guarda-chuva", 26: "Bolsa", 27: "Gravata", 28: "Mala", 29: "Frisbee", 30: "Esqui",
+    31: "Snowboard", 32: "Bola de Esportes", 33: "Pipa", 34: "Taco de Beisebol", 35: "Luva de Beisebol",
+    36: "Skate", 37: "Prancha de Surfe", 38: "Raquete de Tênis", 39: "Garrafa", 40: "Taça de Vinho", 41: "Copo",
+    42: "Garfo", 43: "Faca", 44: "Colher", 45: "Tigela", 46: "Banana", 47: "Maçã", 48: "Sanduíche", 49: "Laranja",
+    50: "Brócolis", 51: "Cenoura", 52: "Cachorro-quente", 53: "Pizza", 54: "Donut", 55: "Bolo", 56: "Cadeira",
+    57: "Sofá", 58: "Planta em Vaso", 59: "Cama", 60: "Mesa de Jantar", 61: "Vaso Sanitário", 62: "TV / Monitor",
+    63: "Notebook", 64: "Mouse", 65: "Controle Remoto", 66: "Teclado", 67: "Celular", 68: "Micro-ondas",
+    69: "Forno", 70: "Torradeira", 71: "Pia", 72: "Geladeira", 73: "Livro", 74: "Relógio", 75: "Vaso",
+    76: "Tesoura", 77: "Urso de Pelúcia", 78: "Secador de Cabelo", 79: "Escova de Dentes"
 }
 
 def identify_cat_individual(crop_bgr: np.ndarray, full_frame_bgr: Optional[np.ndarray] = None) -> str:
@@ -220,13 +224,21 @@ class CatCamDetector:
         self.current_video_writer = None
         self.current_video_filename = None
         self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
+        self.visit_other_counts: Dict[str, int] = collections.defaultdict(int)
         
+        self.target_cats: List[str] = ["beatriz", "serena"]
+        self.target_presets: List[str] = ["cats"]
+        self.extra_classes: List[int] = []
+
         # Telemetria ao vivo
         self.status: Dict[str, Any] = {
             "camera_online": False,
             "target_mode": "cat",
             "color_filter": "none",
             "target_fps": 15,
+            "target_cats": self.target_cats,
+            "target_presets": self.target_presets,
+            "extra_classes": self.extra_classes,
             "detected_count": 0,
             "in_zone_count": 0,
             "object_detected": False,
@@ -266,9 +278,16 @@ class CatCamDetector:
                     self.target_fps = data.get("target_fps", 15)
                     self.target_mode = data.get("target_mode", "cat")
                     self.color_filter = data.get("color_filter", "none")
+                    self.target_cats = data.get("target_cats", ["beatriz", "serena"])
+                    self.target_presets = data.get("target_presets", ["cats"])
+                    self.extra_classes = data.get("extra_classes", [])
+
                     self.status["target_mode"] = self.target_mode
                     self.status["color_filter"] = self.color_filter
                     self.status["target_fps"] = self.target_fps
+                    self.status["target_cats"] = self.target_cats
+                    self.status["target_presets"] = self.target_presets
+                    self.status["extra_classes"] = self.extra_classes
             self._update_zone()
         except Exception as e:
             print(f"[Detector] Erro ao carregar config ROI: {e}")
@@ -278,7 +297,10 @@ class CatCamDetector:
                         debounce: Optional[int] = None,
                         target_fps: Optional[int] = None,
                         target_mode: Optional[str] = None,
-                        color_filter: Optional[str] = None):
+                        color_filter: Optional[str] = None,
+                        target_cats: Optional[List[str]] = None,
+                        target_presets: Optional[List[str]] = None,
+                        extra_classes: Optional[List[int]] = None):
         if polygon is not None:
             self.polygon_normalized = polygon
         if confidence is not None:
@@ -294,6 +316,15 @@ class CatCamDetector:
         if color_filter is not None:
             self.color_filter = color_filter
             self.status["color_filter"] = self.color_filter
+        if target_cats is not None:
+            self.target_cats = target_cats
+            self.status["target_cats"] = self.target_cats
+        if target_presets is not None:
+            self.target_presets = target_presets
+            self.status["target_presets"] = self.target_presets
+        if extra_classes is not None:
+            self.extra_classes = extra_classes
+            self.status["extra_classes"] = self.extra_classes
 
         data = {
             "polygon": self.polygon_normalized,
@@ -301,7 +332,10 @@ class CatCamDetector:
             "debounce_seconds": self.debounce_seconds,
             "target_fps": self.target_fps,
             "target_mode": self.target_mode,
-            "color_filter": self.color_filter
+            "color_filter": self.color_filter,
+            "target_cats": self.target_cats,
+            "target_presets": self.target_presets,
+            "extra_classes": self.extra_classes
         }
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -362,7 +396,22 @@ class CatCamDetector:
             fps_monitor.tick()
             self.status["fps"] = round(fps_monitor.fps, 1)
 
-            target_classes = MODE_CLASSES.get(self.target_mode, [15])
+            # Combina classes ativas dos checkboxes + classes extras do multi-select
+            active_classes = set()
+            if "cats" in self.target_presets or len(self.target_cats) > 0:
+                active_classes.add(15)
+            if "dogs" in self.target_presets:
+                active_classes.add(16)
+            if "persons" in self.target_presets:
+                active_classes.add(0)
+            if "vehicles" in self.target_presets:
+                active_classes.update([2, 3, 5, 7])
+            if self.extra_classes:
+                active_classes.update(self.extra_classes)
+            if not active_classes:
+                target_classes = MODE_CLASSES.get(self.target_mode, [15])
+            else:
+                target_classes = list(active_classes)
 
             t0 = time.perf_counter()
             results = self.model.predict(
@@ -413,6 +462,7 @@ class CatCamDetector:
                     self.is_visiting = True
                     self.visit_start_time = now
                     self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
+                    self.visit_other_counts = collections.defaultdict(int)
                     self.current_video_filename = f"evento_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
                     video_filepath = os.path.join(RECORDINGS_DIR, self.current_video_filename)
                     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -446,8 +496,10 @@ class CatCamDetector:
                         visitor_name = "Beatriz (Amarela)"
                     elif s_count > b_count and s_count >= 2:
                         visitor_name = "Serena (Cinza)"
-                    elif n_count > 0:
+                    elif n_count > 0 and (b_count == 0 and s_count == 0):
                         visitor_name = "Gato (Visão Noturna)"
+                    elif self.visit_other_counts:
+                        visitor_name = max(self.visit_other_counts.items(), key=lambda x: x[1])[0]
                     elif self.target_mode == "vehicles":
                         visitor_name = "Veículo"
                     elif self.target_mode == "person":
@@ -514,6 +566,17 @@ class CatCamDetector:
                         cat_identity = identify_cat_individual(cat_crop, raw_frame)
                         current_frame_cats.append(cat_identity)
 
+                        if self.target_cats:
+                            has_b = "beatriz" in self.target_cats
+                            has_s = "serena" in self.target_cats
+                            has_o = "other" in self.target_cats
+                            if "Beatriz" in cat_identity and not has_b:
+                                continue
+                            if "Serena" in cat_identity and not has_s:
+                                continue
+                            if ("Noturno" in cat_identity or cat_identity == "Gato") and not (has_o or (has_b and has_s)):
+                                continue
+
                         if self.target_mode == "cat_beatriz" and "Beatriz" not in cat_identity:
                             continue
                         if self.target_mode == "cat_serena" and "Serena" not in cat_identity:
@@ -541,6 +604,9 @@ class CatCamDetector:
                         self.visit_cat_counts["Serena"] += 1
                     elif "Noturno" in c_name:
                         self.visit_cat_counts["Noturno"] += 1
+                for obj in objects_payload:
+                    if obj.get("in_zone") and obj.get("class_id") != 15:
+                        self.visit_other_counts[obj.get("name", "Objeto")] += 1
 
             # Codifica com otimização rápida
             ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
