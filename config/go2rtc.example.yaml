@@ -1,0 +1,13 @@
+api:
+  listen: ":1984"
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555"
+
+streams:
+  cat_cam:
+    # Substitua com os dados obtidos no pareamento via Tuya Smart
+    - "tuya://protect-us.ismartlife.me?device_id=SEU_DEVICE_ID&email=seu_email@dominio.com&password=SUA_SENHA"
