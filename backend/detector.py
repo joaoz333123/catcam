@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import threading
+import subprocess
 import collections
 import cv2
 import numpy as np
@@ -67,6 +68,41 @@ def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
     except Exception:
         pass
     return True
+
+
+def convert_video_to_h264(filepath: str):
+    """
+    Converte o arquivo de vídeo gerado para H.264 (avc1) com moov atom no início (+faststart).
+    Isso é 100% obrigatório para reprodução nativa em navegadores HTML5 (Chrome, Edge, Safari).
+    """
+    def _worker():
+        if not os.path.exists(filepath):
+            return
+        tmp_path = filepath + ".tmp.mp4"
+        try:
+            cmd = [
+                "ffmpeg", "-y", "-i", filepath,
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                tmp_path
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45)
+            if res.returncode == 0 and os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+                os.replace(tmp_path, filepath)
+                print(f"[Detector] Vídeo convertido para H.264 Web compatível: {os.path.basename(filepath)}")
+            elif os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception as e:
+            print(f"[Detector] Erro ao converter vídeo para H.264: {e}")
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 class FreshFrameReader(threading.Thread):
@@ -364,7 +400,9 @@ class CatCamDetector:
                             duration_seconds=duration,
                             video_filename=self.current_video_filename
                         )
-                        print(f"[Detector] Evento concluído ({duration}s). Salvo no banco de dados.")
+                        full_video_path = os.path.join(RECORDINGS_DIR, self.current_video_filename)
+                        convert_video_to_h264(full_video_path)
+                        print(f"[Detector] Evento concluído ({duration}s). Salvo e disparada conversão H.264 Web.")
                     else:
                         try:
                             os.remove(os.path.join(RECORDINGS_DIR, self.current_video_filename))

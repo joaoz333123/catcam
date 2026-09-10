@@ -720,7 +720,7 @@
         <button class="modal-close" onclick="closeVideoModal()">&times;</button>
       </div>
       <div class="modal-video-wrapper">
-        <video id="modal-video-player" controls preload="auto"></video>
+        <video id="modal-video-player" controls preload="metadata" playsinline></video>
       </div>
     </div>
   </div>
@@ -1153,16 +1153,25 @@
       const title = document.getElementById('modal-video-title');
 
       title.innerText = `Evento de ${startTime} (${duration} segundos)`;
-      player.src = `/api/recordings/${filename}`;
+      player.pause();
+      player.innerHTML = `<source src="/api/recordings/${encodeURIComponent(filename)}" type="video/mp4">Seu navegador não suporta vídeo HTML5.`;
+      player.load();
       modal.style.display = 'flex';
-      player.play();
+      const playPromise = player.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => {
+          console.warn("Reprodução automática aguardando interação:", e);
+        });
+      }
     }
 
     function closeVideoModal() {
       const modal = document.getElementById('video-modal');
       const player = document.getElementById('modal-video-player');
       player.pause();
-      player.src = '';
+      player.removeAttribute('src');
+      player.innerHTML = '';
+      player.load();
       modal.style.display = 'none';
     }
 

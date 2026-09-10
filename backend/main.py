@@ -122,12 +122,19 @@ def stream_annotated():
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
-@app.get("/api/recordings/{filename}")
+@app.api_route("/api/recordings/{filename}", methods=["GET", "HEAD"])
 def get_recording(filename: str):
     filepath = os.path.join(RECORDINGS_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Arquivo de gravação não encontrado.")
-    return FileResponse(filepath, media_type="video/mp4")
+    return FileResponse(
+        filepath,
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
+    )
 
 # Servir Frontend
 @app.get("/", response_class=HTMLResponse)
