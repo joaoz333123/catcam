@@ -15,6 +15,7 @@ __pycache__/
 *.onnx
 *.bin
 openvino_model/
+yolo11n_openvino_model/
 
 # Banco de dados e gravações de vídeo
 data/events.db

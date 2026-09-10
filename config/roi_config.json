@@ -1,0 +1,10 @@
+{
+  "polygon": [
+    [0.25, 0.35],
+    [0.75, 0.35],
+    [0.75, 0.85],
+    [0.25, 0.85]
+  ],
+  "confidence_threshold": 0.45,
+  "debounce_seconds": 5
+}
