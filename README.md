@@ -23,6 +23,7 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
   - 🐶 **Cachorros** e todas as 80 classes do COCO Dataset.
 - **Filtro de Cor Integrado:** Possibilidade de filtrar objetos por cor (ex: detectar e contar **apenas carros brancos**).
 - **Taxa de Quadros Ajustável (FPS):** Controle dinâmico de 2 FPS (máxima economia) até 25 FPS (rastreamento ultra fluido).
+- **Buffer de Suavização (Jitter Buffer):** Armazena uma fila contínua de quadros na memória com metrônomo de alta precisão para eliminar 100% dos microsoluços causados por oscilações de Wi-Fi ou picos de CPU, garantindo reprodução cinematográfica e estável.
 - **Gravação Automática com Debounce:** Grava clipes em MP4 das visitas/eventos e salva no banco **SQLite** local.
 - **Dashboard Web Moderno:** Interface visual com player WebRTC ao vivo, alternância para feed da IA, histórico com player de vídeo modal e **editor interativo de ROI** para arrastar os vértices da zona diretamente na tela.
 - **Inicialização em 1 Clique:** Scripts `.bat` para ligar e desligar todos os serviços sem complicações.

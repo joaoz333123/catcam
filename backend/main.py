@@ -97,18 +97,10 @@ def update_roi(payload: ROIUpdateRequest):
 
 @app.get("/api/feed/annotated")
 def stream_annotated():
-    def frame_generator():
-        last_jpeg = None
-        while True:
-            jpeg = detector.get_annotated_jpeg()
-            if jpeg is not None and jpeg != last_jpeg:
-                last_jpeg = jpeg
-                yield (b"--frame\r\n"
-                       b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n")
-            import time
-            time.sleep(0.03) # Verifica a ~30 Hz e envia quadros na velocidade real do detector
-
-    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(
+        detector.generate_smooth_stream(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
 
 @app.get("/api/recordings/{filename}")
 def get_recording(filename: str):

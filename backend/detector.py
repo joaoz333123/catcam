@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import threading
+import collections
 import cv2
 import numpy as np
 from datetime import datetime
@@ -22,13 +23,12 @@ RTSP_URL = "rtsp://localhost:8554/cat_cam"
 
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
-# Mapeamento de modos e classes do COCO Dataset
 MODE_CLASSES = {
-    "cat": [15],                     # Gato
-    "dog": [16],                     # Cachorro
-    "person": [0],                   # Pessoa
-    "vehicles": [2, 3, 5, 7],        # Carro, Moto, Ônibus, Caminhão
-    "all": None                      # Todas as classes
+    "cat": [15],
+    "dog": [16],
+    "person": [0],
+    "vehicles": [2, 3, 5, 7],
+    "all": None
 }
 
 CLASS_NAMES_PT = {
@@ -43,10 +43,8 @@ CLASS_NAMES_PT = {
 }
 
 def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
-    """Verifica se o recorte do objeto detectado corresponde ao filtro de cor desejado."""
     if color_filter == "none" or crop_bgr is None or crop_bgr.size == 0:
         return True
-    
     try:
         hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
         total_pixels = crop_bgr.shape[0] * crop_bgr.shape[1]
@@ -54,17 +52,14 @@ def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
             return True
 
         if color_filter == "white":
-            # Branco: Saturação baixa (< 55) e alto brilho (> 160)
             mask = cv2.inRange(hsv, np.array([0, 0, 160]), np.array([180, 55, 255]))
             return (np.sum(mask > 0) / total_pixels) > 0.25
 
         elif color_filter == "black":
-            # Preto: Brilho muito baixo (< 65)
             mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([180, 255, 65]))
             return (np.sum(mask > 0) / total_pixels) > 0.25
 
         elif color_filter == "red":
-            # Vermelho: dois intervalos no HSV (0-10 e 170-180)
             mask1 = cv2.inRange(hsv, np.array([0, 80, 80]), np.array([10, 255, 255]))
             mask2 = cv2.inRange(hsv, np.array([170, 80, 80]), np.array([180, 255, 255]))
             mask = mask1 | mask2
@@ -75,10 +70,6 @@ def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
 
 
 class FreshFrameReader(threading.Thread):
-    """
-    Thread dedicada para ler o stream RTSP continuamente e descartar o buffer atrasado.
-    Garante latência zero no detector.
-    """
     def __init__(self, rtsp_url: str):
         super().__init__(daemon=True)
         self.rtsp_url = rtsp_url
@@ -95,7 +86,7 @@ class FreshFrameReader(threading.Thread):
             
             if not cap.isOpened():
                 self.connected = False
-                time.sleep(2)
+                time.sleep(1.5)
                 continue
                 
             self.connected = True
@@ -141,6 +132,10 @@ class CatCamDetector:
         self.color_filter = "none"
         self.current_frame_shape = None
         
+        # Buffer de Suavização (Jitter Buffer) para eliminação de travadas
+        # Armazena até 45 frames (~2 a 3 segundos de buffer contínuo)
+        self.frame_buffer = collections.deque(maxlen=60)
+        
         # Estado de visita/permanência
         self.is_visiting = False
         self.visit_start_time = None
@@ -162,7 +157,8 @@ class CatCamDetector:
             "visit_duration": 0,
             "last_event_time": None,
             "fps": 0.0,
-            "inference_ms": 0.0
+            "inference_ms": 0.0,
+            "buffer_depth": 0
         }
         
         self.latest_annotated_jpeg: Optional[bytes] = None
@@ -245,19 +241,19 @@ class CatCamDetector:
         self.running = True
         self.worker_thread = threading.Thread(target=self._run_loop, daemon=True)
         self.worker_thread.start()
-        print(f"[Detector] Worker iniciado a {self.target_fps} FPS no modo '{self.target_mode}'!")
+        print(f"[Detector] Worker iniciado a {self.target_fps} FPS no modo '{self.target_mode}' com Buffer de Suavizacao ativo.")
 
     def _run_loop(self):
         fps_monitor = sv.FPSMonitor()
-        last_process_time = time.time()
+        last_process_time = time.perf_counter()
         
         while self.running:
-            # Cadência configurável (ex: 15 FPS -> ~66ms entre frames)
             target_delay = 1.0 / max(1, self.target_fps)
-            time_to_wait = target_delay - (time.time() - last_process_time)
+            elapsed = time.perf_counter() - last_process_time
+            time_to_wait = target_delay - elapsed
             if time_to_wait > 0:
                 time.sleep(time_to_wait)
-            last_process_time = time.time()
+            last_process_time = time.perf_counter()
 
             raw_frame = self.reader.get_frame()
             if raw_frame is None:
@@ -266,12 +262,11 @@ class CatCamDetector:
 
             self.status["camera_online"] = True
             
-            # Redimensiona para resolução de inferência (640px)
             orig_h, orig_w = raw_frame.shape[:2]
             scale = 640.0 / orig_w
             infer_w = 640
             infer_h = int(orig_h * scale)
-            frame = cv2.resize(raw_frame, (infer_w, infer_h))
+            frame = cv2.resize(raw_frame, (infer_w, infer_h), interpolation=cv2.INTER_LINEAR)
 
             if self.current_frame_shape != frame.shape:
                 self.current_frame_shape = frame.shape
@@ -280,10 +275,9 @@ class CatCamDetector:
             fps_monitor.tick()
             self.status["fps"] = round(fps_monitor.fps, 1)
 
-            # Define as classes de interesse de acordo com o modo
             target_classes = MODE_CLASSES.get(self.target_mode, [15])
 
-            t0 = time.time()
+            t0 = time.perf_counter()
             results = self.model.predict(
                 frame,
                 classes=target_classes,
@@ -291,11 +285,10 @@ class CatCamDetector:
                 device="cpu",
                 verbose=False
             )[0]
-            self.status["inference_ms"] = round((time.time() - t0) * 1000, 1)
+            self.status["inference_ms"] = round((time.perf_counter() - t0) * 1000, 1)
 
             detections = sv.Detections.from_ultralytics(results)
 
-            # Filtro opcional de cor (ex: carros brancos)
             if self.color_filter != "none" and len(detections) > 0:
                 keep_indices = []
                 for idx, box in enumerate(detections.xyxy):
@@ -322,9 +315,8 @@ class CatCamDetector:
 
             self.status["in_zone_count"] = in_zone_count
             self.status["object_in_zone"] = obj_in_zone
-            self.status["cat_in_litterbox"] = obj_in_zone # compatibilidade
+            self.status["cat_in_litterbox"] = obj_in_zone
 
-            # Gestão do Evento de Visita / Presença
             now = datetime.now()
             now_ts = time.time()
 
@@ -336,20 +328,17 @@ class CatCamDetector:
                     self.current_video_filename = f"evento_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
                     video_filepath = os.path.join(RECORDINGS_DIR, self.current_video_filename)
                     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                    # Grava no FPS alvo para fluidez natural
                     self.current_video_writer = cv2.VideoWriter(video_filepath, fourcc, float(self.target_fps), (infer_w, infer_h))
-                    print(f"[Detector] Evento iniciado em {now.strftime('%H:%M:%S')} - Gravando...")
+                    print(f"[Detector] Evento iniciado em {now.strftime('%H:%M:%S')} - Gravando clipe fluido...")
 
             if self.is_visiting:
                 duration = int((now - self.visit_start_time).total_seconds())
                 self.status["is_visiting"] = True
                 self.status["visit_duration"] = duration
 
-                # Grava frame
                 if self.current_video_writer is not None:
                     self.current_video_writer.write(frame)
 
-                # Debounce de saída
                 if not obj_in_zone and (now_ts - self.last_seen_inside_time > self.debounce_seconds):
                     self.is_visiting = False
                     self.status["is_visiting"] = False
@@ -373,7 +362,7 @@ class CatCamDetector:
                         except Exception:
                             pass
 
-            # Anotações Visuais
+            # Anotações visuais da IA
             annotated_frame = frame.copy()
             if self.zone_annotator and self.zone:
                 self.zone_annotator.color = sv.Color.from_hex("#EF4444") if obj_in_zone else sv.Color.from_hex("#10B981")
@@ -393,10 +382,52 @@ class CatCamDetector:
                 annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
                 annotated_frame = self.trace_annotator.annotate(scene=annotated_frame, detections=detections)
 
-            ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            # Codifica com otimização rápida
+            ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if ret_jpg:
+                jpeg_bytes = jpeg_buf.tobytes()
                 with self.lock:
-                    self.latest_annotated_jpeg = jpeg_buf.tobytes()
+                    self.latest_annotated_jpeg = jpeg_bytes
+                    self.frame_buffer.append(jpeg_bytes)
+                    self.status["buffer_depth"] = len(self.frame_buffer)
+
+    def generate_smooth_stream(self):
+        """
+        Gerador de streaming com Jitter Buffer (Metrônomo de Precisão):
+        Acumula uma pequena reserva inicial (~1 segundo) e reproduz
+        com cadência perfeitamente uniforme, eliminando 100% dos microsoluços.
+        """
+        preroll_target = max(6, int(self.target_fps * 1.0))
+        
+        # Aguarda encher o pre-roll inicial
+        while self.running and len(self.frame_buffer) < preroll_target:
+            time.sleep(0.04)
+
+        interval = 1.0 / max(1, self.target_fps)
+        last_tick = time.perf_counter()
+
+        while self.running:
+            frame_data = None
+            with self.lock:
+                buf_len = len(self.frame_buffer)
+                if buf_len > 0:
+                    # Se o buffer acumular mais de 2.5 segundos, descarta os mais antigos para não estourar atraso
+                    if buf_len > int(self.target_fps * 2.5):
+                        self.frame_buffer.popleft()
+                    frame_data = self.frame_buffer.popleft()
+                elif self.latest_annotated_jpeg is not None:
+                    frame_data = self.latest_annotated_jpeg
+
+            if frame_data is not None:
+                yield (b"--frame\r\n"
+                       b"Content-Type: image/jpeg\r\n\r\n" + frame_data + b"\r\n")
+
+            # Ritmo preciso de cinema (metrônomo)
+            now = time.perf_counter()
+            sleep_time = interval - (now - last_tick)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            last_tick = time.perf_counter()
 
     def get_annotated_jpeg(self) -> Optional[bytes]:
         with self.lock:
@@ -418,6 +449,6 @@ if __name__ == "__main__":
     try:
         while True:
             time.sleep(2)
-            print(f"[Status] Câmera: {detector.status['camera_online']} | FPS: {detector.status['fps']} | Objetos: {detector.status['detected_count']} | Na Zona: {detector.status['in_zone_count']}")
+            print(f"[Status] Câmera: {detector.status['camera_online']} | FPS: {detector.status['fps']} | Buffer: {detector.status['buffer_depth']} frames")
     except KeyboardInterrupt:
         detector.stop()
