@@ -10,7 +10,8 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
 
 - **Zero Custo de Nuvem:** Operação 100% offline no seu computador local, sem envio de imagens para serviços externos.
 - **Aceleração Intel OpenVINO:** Inferência ultrarrápida (~30 ms) otimizada para gráficos integrados **Intel Iris Xe** e processadores Intel Core, mantendo o computador frio e consumindo pouca energia.
-- **Streaming WebRTC de Baixa Latência:** Gateway de vídeo integrado via **go2rtc**, servindo WebRTC sub-segundo no navegador e RTSP local para a inteligência artificial.
+- **Streaming WebRTC de Baixa Latência & Alta Fluidez:** Gateway de vídeo integrado via **go2rtc**, servindo WebRTC nativo (25–30 FPS) com aceleração por hardware de vídeo no navegador.
+- **Overlay IA em Tempo Real (60 FPS):** Em vez de reencodar vídeo lento em MJPEG (que causa perda de quadros nos navegadores), o dashboard renderiza o stream nativo WebRTC a 30 FPS e projeta as caixas de detecção e zona de interesse através de uma camada vetorial acelerada por GPU a 60 FPS via WebSocket de baixa latência (<2ms).
 - **Arquitetura Anti-Lag (Zero Buffer Delay):** Leitor de frames desacoplado em thread dedicada que descarta acúmulos de buffer RTSP, garantindo análise instantânea do momento presente.
 - **Suíte Supervision Completa:**
   - `PolygonZone`: Delimitação precisa de áreas de interesse (caixa de areia, portão, vaga, etc.).
@@ -23,9 +24,9 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
   - 🐶 **Cachorros** e todas as 80 classes do COCO Dataset.
 - **Filtro de Cor Integrado:** Possibilidade de filtrar objetos por cor (ex: detectar e contar **apenas carros brancos**).
 - **Taxa de Quadros Ajustável (FPS):** Controle dinâmico de 2 FPS (máxima economia) até 25 FPS (rastreamento ultra fluido).
-- **Buffer de Suavização (Jitter Buffer):** Armazena uma fila contínua de quadros na memória com metrônomo de alta precisão para eliminar 100% dos microsoluços causados por oscilações de Wi-Fi ou picos de CPU, garantindo reprodução cinematográfica e estável.
+- **Buffer de Suavização (Jitter Buffer):** Armazena uma fila contínua de quadros na memória com cadência uniforme para gravações de clipes e compatibilidade de feed.
 - **Gravação Automática com Debounce:** Grava clipes em MP4 das visitas/eventos e salva no banco **SQLite** local.
-- **Dashboard Web Moderno:** Interface visual com player WebRTC ao vivo, alternância para feed da IA, histórico com player de vídeo modal e **editor interativo de ROI** para arrastar os vértices da zona diretamente na tela.
+- **Dashboard Web Moderno:** Interface visual com abas de transmissão instantânea (**Visão IA Fluida**, **Ao Vivo Puro** e **MJPEG Legado**), métricas ao vivo, histórico com player de vídeo modal e **editor interativo de ROI** para arrastar os vértices da zona diretamente na tela.
 - **Inicialização em 1 Clique:** Scripts `.bat` para ligar e desligar todos os serviços sem complicações.
 
 ---
@@ -81,7 +82,7 @@ cd catcam
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install --upgrade pip
-pip install ultralytics openvino supervision fastapi uvicorn[standard] opencv-python aiofiles
+pip install ultralytics openvino supervision fastapi "uvicorn[standard]" opencv-python aiofiles websockets
 ```
 
 ### 3. Baixar o Gateway de Vídeo (go2rtc)

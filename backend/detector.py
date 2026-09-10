@@ -162,6 +162,15 @@ class CatCamDetector:
         }
         
         self.latest_annotated_jpeg: Optional[bytes] = None
+        self.latest_ai_payload: Dict[str, Any] = {
+            "objects": [],
+            "in_zone": False,
+            "in_zone_count": 0,
+            "polygon": self.polygon_normalized,
+            "fps": 0.0,
+            "inference_ms": 0.0,
+            "ts": 0.0
+        }
         self.lock = threading.Lock()
         self.running = False
         self.worker_thread = None
@@ -382,6 +391,28 @@ class CatCamDetector:
                 annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
                 annotated_frame = self.trace_annotator.annotate(scene=annotated_frame, detections=detections)
 
+            # Extrai payload de detecção estruturado para o Overlay WebRTC em tempo real
+            objects_payload = []
+            if obj_count > 0:
+                is_inside_list = self.zone.trigger(detections=detections) if self.zone is not None else [False] * obj_count
+                for idx, (box, class_id, conf) in enumerate(zip(detections.xyxy, detections.class_id, detections.confidence)):
+                    tracker_id = detections.tracker_id[idx] if detections.tracker_id is not None else None
+                    x1_n = round(float(box[0]) / infer_w, 4)
+                    y1_n = round(float(box[1]) / infer_h, 4)
+                    x2_n = round(float(box[2]) / infer_w, 4)
+                    y2_n = round(float(box[3]) / infer_h, 4)
+                    c_id = int(class_id)
+                    name = CLASS_NAMES_PT.get(c_id, f"ID:{c_id}")
+                    inside = bool(is_inside_list[idx]) if idx < len(is_inside_list) else False
+
+                    objects_payload.append({
+                        "box": [x1_n, y1_n, x2_n, y2_n],
+                        "class_id": c_id,
+                        "label": f"{name} #{tracker_id}" if tracker_id is not None else name,
+                        "conf": round(float(conf), 2),
+                        "in_zone": inside
+                    })
+
             # Codifica com otimização rápida
             ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if ret_jpg:
@@ -390,6 +421,20 @@ class CatCamDetector:
                     self.latest_annotated_jpeg = jpeg_bytes
                     self.frame_buffer.append(jpeg_bytes)
                     self.status["buffer_depth"] = len(self.frame_buffer)
+                    self.latest_ai_payload = {
+                        "objects": objects_payload,
+                        "in_zone": obj_in_zone,
+                        "in_zone_count": in_zone_count,
+                        "polygon": self.polygon_normalized,
+                        "fps": self.status["fps"],
+                        "inference_ms": self.status["inference_ms"],
+                        "target_mode": self.target_mode,
+                        "ts": time.time()
+                    }
+
+    def get_latest_ai_payload(self) -> Dict[str, Any]:
+        with self.lock:
+            return dict(self.latest_ai_payload)
 
     def generate_smooth_stream(self):
         """

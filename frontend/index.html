@@ -272,6 +272,17 @@
       display: block;
     }
 
+    #ai-overlay-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 6;
+      pointer-events: none;
+      display: block;
+    }
+
     #roi-canvas {
       position: absolute;
       top: 0;
@@ -629,16 +640,20 @@
             <span id="video-stream-title">📹 Transmissão da Câmera</span>
           </div>
           <div class="video-tabs">
-            <button id="tab-webrtc" class="video-tab-btn active" onclick="switchStreamTab('webrtc')">Ao Vivo (WebRTC)</button>
-            <button id="tab-annotated" class="video-tab-btn" onclick="switchStreamTab('annotated')">Visão IA (Detecção)</button>
+            <button id="tab-ai-overlay" class="video-tab-btn active" onclick="switchStreamTab('ai_overlay')">⚡ Visão IA (WebRTC Fluido)</button>
+            <button id="tab-webrtc" class="video-tab-btn" onclick="switchStreamTab('webrtc')">📹 Ao Vivo Puro</button>
+            <button id="tab-annotated" class="video-tab-btn" onclick="switchStreamTab('annotated')">🎞️ Feed MJPEG</button>
           </div>
         </div>
 
         <div class="player-container">
-          <!-- WebRTC Frame direto do go2rtc -->
+          <!-- WebRTC Frame direto do go2rtc (aceleração por hardware H.264, 30 FPS fluido) -->
           <iframe id="webrtc-player-iframe" src="http://localhost:1984/stream.html?src=cat_cam"></iframe>
           
-          <!-- Imagem do feed anotado (MJPEG) -->
+          <!-- Canvas do Overlay IA em tempo real (renderizado a 60 FPS com aceleração de GPU) -->
+          <canvas id="ai-overlay-canvas"></canvas>
+
+          <!-- Imagem do feed legado MJPEG -->
           <img id="annotated-img" class="video-element" src="" style="display: none;" alt="Feed IA">
 
           <!-- Canvas interativo para desenhar e ajustar ROI -->
@@ -794,25 +809,222 @@
     const canvas = document.getElementById('roi-canvas');
     const ctx = canvas.getContext('2d');
 
+    const aiCanvas = document.getElementById('ai-overlay-canvas');
+    const aiCtx = aiCanvas.getContext('2d');
+
+    let currentStreamTab = 'ai_overlay';
+    let currentDetections = {
+      objects: [],
+      in_zone: false,
+      polygon: [],
+      fps: 0,
+      inference_ms: 0
+    };
+
     function switchStreamTab(tab) {
+      currentStreamTab = tab;
       const webrtcFrame = document.getElementById('webrtc-player-iframe');
       const annotatedImg = document.getElementById('annotated-img');
+      const aiOverlay = document.getElementById('ai-overlay-canvas');
+      const tabAiOverlay = document.getElementById('tab-ai-overlay');
       const tabWebrtc = document.getElementById('tab-webrtc');
       const tabAnnotated = document.getElementById('tab-annotated');
 
-      if (tab === 'webrtc') {
-        tabWebrtc.classList.add('active');
-        tabAnnotated.classList.remove('active');
+      tabAiOverlay.classList.remove('active');
+      tabWebrtc.classList.remove('active');
+      tabAnnotated.classList.remove('active');
+
+      if (tab === 'ai_overlay') {
+        tabAiOverlay.classList.add('active');
         webrtcFrame.style.display = 'block';
+        aiOverlay.style.display = 'block';
         annotatedImg.style.display = 'none';
         annotatedImg.src = '';
-      } else {
-        tabWebrtc.classList.remove('active');
+      } else if (tab === 'webrtc') {
+        tabWebrtc.classList.add('active');
+        webrtcFrame.style.display = 'block';
+        aiOverlay.style.display = 'none';
+        annotatedImg.style.display = 'none';
+        annotatedImg.src = '';
+      } else if (tab === 'annotated') {
         tabAnnotated.classList.add('active');
         webrtcFrame.style.display = 'none';
+        aiOverlay.style.display = 'none';
         annotatedImg.style.display = 'block';
         annotatedImg.src = '/api/feed/annotated?' + Date.now();
       }
+    }
+
+    let wsDetections = null;
+    function connectDetectionWS() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host || 'localhost:8000';
+      const wsUrl = `${protocol}//${host}/ws/detections`;
+
+      try {
+        wsDetections = new WebSocket(wsUrl);
+        wsDetections.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            currentDetections = data;
+            if (data.polygon && !roiEditing) {
+              polygon = data.polygon;
+            }
+          } catch (err) {}
+        };
+        wsDetections.onclose = () => {
+          setTimeout(connectDetectionWS, 1500);
+        };
+        wsDetections.onerror = () => {
+          wsDetections.close();
+        };
+      } catch (e) {
+        setTimeout(connectDetectionWS, 2000);
+      }
+    }
+
+    // Polling de fallback caso o WebSocket esteja desconectado
+    setInterval(async () => {
+      if (!wsDetections || wsDetections.readyState !== WebSocket.OPEN) {
+        try {
+          const res = await fetch('/api/detections');
+          if (res.ok) {
+            const data = await res.json();
+            currentDetections = data;
+            if (data.polygon && !roiEditing) {
+              polygon = data.polygon;
+            }
+          }
+        } catch (e) {}
+      }
+    }, 150);
+
+    function renderAIOverlay() {
+      if (!aiCanvas || !aiCtx) {
+        requestAnimationFrame(renderAIOverlay);
+        return;
+      }
+
+      const rect = aiCanvas.parentElement.getBoundingClientRect();
+      if (aiCanvas.width !== rect.width || aiCanvas.height !== rect.height) {
+        aiCanvas.width = rect.width;
+        aiCanvas.height = rect.height;
+      }
+
+      const w = aiCanvas.width;
+      const h = aiCanvas.height;
+
+      aiCtx.clearRect(0, 0, w, h);
+
+      if (currentStreamTab === 'ai_overlay' && !roiEditing && w > 0 && h > 0) {
+        const poly = currentDetections.polygon || polygon;
+        const inZone = currentDetections.in_zone;
+
+        // 1. Desenha a Área de Interesse (ROI)
+        if (poly && poly.length >= 3) {
+          aiCtx.save();
+          aiCtx.beginPath();
+          poly.forEach((p, idx) => {
+            const px = p[0] * w;
+            const py = p[1] * h;
+            if (idx === 0) aiCtx.moveTo(px, py);
+            else aiCtx.lineTo(px, py);
+          });
+          aiCtx.closePath();
+
+          if (inZone) {
+            aiCtx.fillStyle = 'rgba(239, 68, 68, 0.20)';
+            aiCtx.strokeStyle = '#EF4444';
+            aiCtx.shadowColor = '#EF4444';
+            aiCtx.shadowBlur = 10;
+            aiCtx.lineWidth = 3;
+          } else {
+            aiCtx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+            aiCtx.strokeStyle = '#10B981';
+            aiCtx.shadowColor = '#10B981';
+            aiCtx.shadowBlur = 6;
+            aiCtx.lineWidth = 2.5;
+          }
+          aiCtx.fill();
+          aiCtx.stroke();
+
+          // Badge indicador no topo da zona
+          const firstPoint = poly[0];
+          const badgeX = Math.max(12, Math.min(w - 170, firstPoint[0] * w));
+          const badgeY = Math.max(26, firstPoint[1] * h - 8);
+
+          aiCtx.shadowBlur = 0;
+          aiCtx.fillStyle = inZone ? 'rgba(239, 68, 68, 0.92)' : 'rgba(16, 185, 129, 0.92)';
+          const text = inZone ? '🚨 OBJETO NA ÁREA' : '🛡️ ÁREA LIVRE';
+          aiCtx.font = 'bold 11px Outfit, sans-serif';
+          const textWidth = aiCtx.measureText(text).width;
+          
+          aiCtx.beginPath();
+          if (aiCtx.roundRect) {
+            aiCtx.roundRect(badgeX, badgeY - 16, textWidth + 16, 22, 6);
+          } else {
+            aiCtx.rect(badgeX, badgeY - 16, textWidth + 16, 22);
+          }
+          aiCtx.fill();
+
+          aiCtx.fillStyle = '#FFFFFF';
+          aiCtx.fillText(text, badgeX + 8, badgeY);
+          aiCtx.restore();
+        }
+
+        // 2. Desenha Bounding Boxes e Labels de cada objeto detectado
+        if (currentDetections.objects && currentDetections.objects.length > 0) {
+          currentDetections.objects.forEach(obj => {
+            const [x1, y1, x2, y2] = obj.box;
+            const bx = x1 * w;
+            const by = y1 * h;
+            const bw = (x2 - x1) * w;
+            const bh = (y2 - y1) * h;
+
+            if (bw <= 0 || bh <= 0) return;
+
+            aiCtx.save();
+            const color = obj.in_zone ? '#EF4444' : '#6366F1';
+            aiCtx.strokeStyle = color;
+            aiCtx.lineWidth = 2.5;
+            aiCtx.shadowColor = color;
+            aiCtx.shadowBlur = 8;
+
+            // Retângulo arredondado para o objeto
+            aiCtx.beginPath();
+            if (aiCtx.roundRect) {
+              aiCtx.roundRect(bx, by, bw, bh, 6);
+            } else {
+              aiCtx.rect(bx, by, bw, bh);
+            }
+            aiCtx.stroke();
+
+            // Etiqueta com nome e acurácia (%)
+            aiCtx.shadowBlur = 0;
+            const labelText = `${obj.label} (${Math.round(obj.conf * 100)}%)`;
+            aiCtx.font = '600 12px Outfit, sans-serif';
+            const lw = aiCtx.measureText(labelText).width;
+            const lh = 22;
+            const lx = bx;
+            const ly = Math.max(lh + 4, by);
+
+            aiCtx.fillStyle = obj.in_zone ? 'rgba(239, 68, 68, 0.95)' : 'rgba(99, 102, 241, 0.95)';
+            aiCtx.beginPath();
+            if (aiCtx.roundRect) {
+              aiCtx.roundRect(lx, ly - lh, lw + 14, lh, [4, 4, 0, 0]);
+            } else {
+              aiCtx.rect(lx, ly - lh, lw + 14, lh);
+            }
+            aiCtx.fill();
+
+            aiCtx.fillStyle = '#FFFFFF';
+            aiCtx.fillText(labelText, lx + 7, ly - 6);
+            aiCtx.restore();
+          });
+        }
+      }
+
+      requestAnimationFrame(renderAIOverlay);
     }
 
     async function loadStatus() {
@@ -1141,6 +1353,8 @@
       loadStatus();
       loadVisits();
       loadROIConfig();
+      connectDetectionWS();
+      requestAnimationFrame(renderAIOverlay);
       setInterval(loadStatus, 2000);
       setInterval(loadVisits, 10000);
     });

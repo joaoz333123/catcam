@@ -1,12 +1,13 @@
 import os
 import sys
-from fastapi import FastAPI, HTTPException, Request, Response
+import asyncio
+import json
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
-import json
 
 # Setup imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -94,6 +95,25 @@ def update_roi(payload: ROIUpdateRequest):
         return {"status": "success", "message": "Configurações atualizadas com sucesso!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/detections")
+def get_detections():
+    return detector.get_latest_ai_payload()
+
+@app.websocket("/ws/detections")
+async def websocket_detections(websocket: WebSocket):
+    await websocket.accept()
+    last_ts = 0.0
+    try:
+        while True:
+            payload = detector.get_latest_ai_payload()
+            ts = payload.get("ts", 0.0)
+            if ts != last_ts:
+                last_ts = ts
+                await websocket.send_json(payload)
+            await asyncio.sleep(0.033)
+    except (WebSocketDisconnect, Exception):
+        pass
 
 @app.get("/api/feed/annotated")
 def stream_annotated():
