@@ -17,6 +17,30 @@ from ultralytics import YOLO
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from backend.database import record_visit, get_visits
 
+try:
+    from winotify import Notification, audio
+    WINOTIFY_AVAILABLE = True
+except ImportError:
+    WINOTIFY_AVAILABLE = False
+
+def send_windows_notification_async(title: str, msg: str):
+    if not WINOTIFY_AVAILABLE:
+        return
+    def _worker():
+        try:
+            toast = Notification(
+                app_id="CatCam AI Vision",
+                title=title,
+                msg=msg,
+                duration="short"
+            )
+            toast.set_audio(audio.Default, loop=False)
+            toast.add_actions(label="Ver ao Vivo", launch="http://localhost:8000")
+            toast.show()
+        except Exception as e:
+            print(f"[Notifier] Erro ao disparar toast do Windows: {e}")
+    threading.Thread(target=_worker, daemon=True).start()
+
 CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "roi_config.json"))
 MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "yolo11n_openvino_model"))
 RECORDINGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "recordings"))
@@ -229,6 +253,9 @@ class CatCamDetector:
         self.target_cats: List[str] = ["beatriz", "serena"]
         self.target_presets: List[str] = ["cats"]
         self.extra_classes: List[int] = []
+        self.notifications_enabled: bool = True
+        self.last_notification_time: float = 0.0
+        self.last_notified_target: str = ""
 
         # Telemetria ao vivo
         self.status: Dict[str, Any] = {
@@ -239,6 +266,7 @@ class CatCamDetector:
             "target_cats": self.target_cats,
             "target_presets": self.target_presets,
             "extra_classes": self.extra_classes,
+            "notifications_enabled": self.notifications_enabled,
             "detected_count": 0,
             "in_zone_count": 0,
             "object_detected": False,
@@ -259,6 +287,7 @@ class CatCamDetector:
             "polygon": self.polygon_normalized,
             "fps": 0.0,
             "inference_ms": 0.0,
+            "alert": None,
             "ts": 0.0
         }
         self.lock = threading.Lock()
@@ -281,6 +310,7 @@ class CatCamDetector:
                     self.target_cats = data.get("target_cats", ["beatriz", "serena"])
                     self.target_presets = data.get("target_presets", ["cats"])
                     self.extra_classes = data.get("extra_classes", [])
+                    self.notifications_enabled = data.get("notifications_enabled", True)
 
                     self.status["target_mode"] = self.target_mode
                     self.status["color_filter"] = self.color_filter
@@ -288,6 +318,7 @@ class CatCamDetector:
                     self.status["target_cats"] = self.target_cats
                     self.status["target_presets"] = self.target_presets
                     self.status["extra_classes"] = self.extra_classes
+                    self.status["notifications_enabled"] = self.notifications_enabled
             self._update_zone()
         except Exception as e:
             print(f"[Detector] Erro ao carregar config ROI: {e}")
@@ -300,7 +331,8 @@ class CatCamDetector:
                         color_filter: Optional[str] = None,
                         target_cats: Optional[List[str]] = None,
                         target_presets: Optional[List[str]] = None,
-                        extra_classes: Optional[List[int]] = None):
+                        extra_classes: Optional[List[int]] = None,
+                        notifications_enabled: Optional[bool] = None):
         if polygon is not None:
             self.polygon_normalized = polygon
         if confidence is not None:
@@ -325,6 +357,9 @@ class CatCamDetector:
         if extra_classes is not None:
             self.extra_classes = extra_classes
             self.status["extra_classes"] = self.extra_classes
+        if notifications_enabled is not None:
+            self.notifications_enabled = notifications_enabled
+            self.status["notifications_enabled"] = self.notifications_enabled
 
         data = {
             "polygon": self.polygon_normalized,
@@ -335,7 +370,8 @@ class CatCamDetector:
             "color_filter": self.color_filter,
             "target_cats": self.target_cats,
             "target_presets": self.target_presets,
-            "extra_classes": self.extra_classes
+            "extra_classes": self.extra_classes,
+            "notifications_enabled": self.notifications_enabled
         }
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -608,6 +644,30 @@ class CatCamDetector:
                     if obj.get("in_zone") and obj.get("class_id") != 15:
                         self.visit_other_counts[obj.get("name", "Objeto")] += 1
 
+            # Disparo Imediato de Notificação Windows e Som (com cooldown anti-spam)
+            alert_payload = None
+            if obj_in_zone and self.notifications_enabled:
+                current_alert_target = None
+                for obj in objects_payload:
+                    if obj.get("in_zone"):
+                        current_alert_target = obj.get("name") or obj.get("label")
+                        break
+
+                if current_alert_target:
+                    time_since_last = now_ts - self.last_notification_time
+                    target_changed = (current_alert_target != self.last_notified_target)
+                    if time_since_last > 25.0 or (target_changed and time_since_last > 6.0):
+                        self.last_notification_time = now_ts
+                        self.last_notified_target = current_alert_target
+                        alert_payload = {
+                            "target": current_alert_target,
+                            "ts": now_ts
+                        }
+                        send_windows_notification_async(
+                            title="🚨 Alerta CatCam AI",
+                            msg=f"{current_alert_target} detectado(a) na área de interesse!"
+                        )
+
             # Codifica com otimização rápida
             ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if ret_jpg:
@@ -624,6 +684,7 @@ class CatCamDetector:
                         "fps": self.status["fps"],
                         "inference_ms": self.status["inference_ms"],
                         "target_mode": self.target_mode,
+                        "alert": alert_payload,
                         "ts": time.time()
                     }
 

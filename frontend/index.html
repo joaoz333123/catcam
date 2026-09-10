@@ -784,6 +784,56 @@
       cursor: pointer;
     }
 
+    /* Toggle Switch Elegante */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 255, 255, 0.15);
+      transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 24px;
+      border: 1px solid var(--border-card);
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: var(--accent-primary);
+      border-color: var(--accent-primary);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+
     /* Tags de Multi-Seleção de Classes Extras */
     .multi-select-tags {
       display: flex;
@@ -1030,6 +1080,24 @@
               <span id="val-debounce" class="slider-val">5s</span>
             </div>
           </div>
+
+          <!-- Notificações Imediatas (Som + Balão Windows) -->
+          <div class="form-group" style="padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div>
+                <label class="form-label" style="margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
+                  <span>🔔 Notificações Imediatas</span>
+                </label>
+                <span style="font-size: 11px; color: var(--text-muted); display: block;">
+                  Aviso sonoro e balão do Windows instantâneo ao detectar alvo na zona.
+                </span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-notifications" checked onchange="triggerAutoSave(); handleNotificationToggle(this.checked);">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1242,6 +1310,82 @@
       });
     }
 
+    let lastAlertTimestamp = 0;
+    let audioCtx = null;
+
+    function playAlertChime() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!audioCtx) {
+          audioCtx = new AudioContext();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        const now = audioCtx.currentTime;
+        // Tom 1: Suave Frequência Fundamental (587.33 Hz - D5)
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now);
+        gain1.gain.setValueAtTime(0.25, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+
+        // Tom 2: Chime Superior Brilhante (880.00 Hz - A5)
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(880.00, now + 0.12);
+        gain2.gain.setValueAtTime(0.001, now);
+        gain2.gain.setValueAtTime(0.3, now + 0.12);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.start(now + 0.12);
+        osc2.stop(now + 0.65);
+      } catch (e) {
+        console.warn("Chime de áudio:", e);
+      }
+    }
+
+    function processIncomingAlert(alert) {
+      if (!alert || !alert.timestamp) return;
+      const notifToggle = document.getElementById('cfg-notifications');
+      const notifEnabled = notifToggle ? notifToggle.checked : true;
+      if (!notifEnabled) return;
+
+      if (alert.timestamp !== lastAlertTimestamp) {
+        lastAlertTimestamp = alert.timestamp;
+        playAlertChime();
+
+        // Notificação do Navegador (caso aba esteja em segundo plano)
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            const n = new Notification(alert.title || "CatCam AI - Alerta", {
+              body: alert.message,
+              tag: 'catcam-alert'
+            });
+            n.onclick = () => {
+              window.focus();
+              n.close();
+            };
+          } catch (e) {}
+        }
+      }
+    }
+
+    function handleNotificationToggle(enabled) {
+      if (enabled && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+
     let wsDetections = null;
     function connectDetectionWS() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1257,6 +1401,9 @@
             if (data.objects) updateTrackedBoxes(data.objects);
             if (data.polygon && !roiEditing) {
               polygon = data.polygon;
+            }
+            if (data.alert) {
+              processIncomingAlert(data.alert);
             }
           } catch (err) {}
         };
@@ -1282,6 +1429,9 @@
             if (data.objects) updateTrackedBoxes(data.objects);
             if (data.polygon && !roiEditing) {
               polygon = data.polygon;
+            }
+            if (data.alert) {
+              processIncomingAlert(data.alert);
             }
           }
         } catch (e) {}
@@ -1749,6 +1899,8 @@
       const conf = parseFloat(document.getElementById('cfg-conf').value) / 100.0;
       const debounce = parseInt(document.getElementById('cfg-debounce').value);
 
+      const notifEnabled = document.getElementById('cfg-notifications')?.checked ?? true;
+
       const statusEl = document.getElementById('auto-save-status');
       try {
         const res = await fetch('/api/roi', {
@@ -1761,7 +1913,8 @@
             color_filter: color,
             target_fps: fps,
             confidence_threshold: conf,
-            debounce_seconds: debounce
+            debounce_seconds: debounce,
+            notifications_enabled: notifEnabled
           })
         });
 
@@ -1822,6 +1975,10 @@
           if (data.debounce_seconds) {
             document.getElementById('cfg-debounce').value = data.debounce_seconds;
             document.getElementById('val-debounce').innerText = data.debounce_seconds + 's';
+          }
+          if (data.notifications_enabled !== undefined) {
+            const notifToggle = document.getElementById('cfg-notifications');
+            if (notifToggle) notifToggle.checked = Boolean(data.notifications_enabled);
           }
         }
       } catch (e) {

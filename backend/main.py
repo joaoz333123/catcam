@@ -40,6 +40,7 @@ class ROIUpdateRequest(BaseModel):
     target_cats: Optional[List[str]] = None
     target_presets: Optional[List[str]] = None
     extra_classes: Optional[List[int]] = None
+    notifications_enabled: Optional[bool] = None
 
 @app.on_event("startup")
 def startup_event():
@@ -98,7 +99,8 @@ def update_roi(payload: ROIUpdateRequest):
             color_filter=payload.color_filter,
             target_cats=payload.target_cats,
             target_presets=payload.target_presets,
-            extra_classes=payload.extra_classes
+            extra_classes=payload.extra_classes,
+            notifications_enabled=payload.notifications_enabled
         )
         return {"status": "success", "message": "Configurações atualizadas com sucesso!"}
     except Exception as e:

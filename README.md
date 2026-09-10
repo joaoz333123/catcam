@@ -29,6 +29,8 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
   - `[ ] 🐶 Cachorros`
 - **Multi-Select de Classes Adicionais (80 Objetos COCO):** Seletor interativo para adicionar objetos extras à busca (como Ônibus, Bicicletas, Mochilas, Pássaros, Barcos, etc.) exibidos em tags dinâmicas removíveis (`[Ônibus ✕]`).
 - **Identificação Individual de Pets (Beatriz vs. Serena):** Reconhecimento cromático em tempo real via análise HSV que identifica quem visitou a área demarcada e grava no histórico (**Beatriz**, **Serena** ou **Ambos**).
+- **Notificações Imediatas com Balão do Windows & Chime Sonoro:** Disparo instantâneo de alerta sonoro e notificação nativa no canto da tela do Windows assim que qualquer alvo configurado (ex: Beatriz, Serena, Pessoas, etc.) entra na área demarcada, com link direto para o dashboard.
+- **Botão Liga/Desliga de Notificações no Painel:** Chave toggle integrada diretamente no painel de configurações para pausar ou reativar alertas sonoros e notificações a qualquer momento, salvo automaticamente.
 - **Rastreamento Anti-Flicker com Interpolação Lerp:** Elimina caixas piscando ou sumindo entre frames; a caixa acompanha o alvo com interpolação contínua a 60 FPS e persistência de 650ms.
 - **Filtro de Cor Integrado:** Possibilidade de filtrar objetos por cor (ex: detectar e contar **apenas carros brancos**).
 - **Taxa de Quadros Ajustável (FPS):** Controle dinâmico de 2 FPS (máxima economia) até 25 FPS (rastreamento ultra fluido).
@@ -93,7 +95,7 @@ cd catcam
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install --upgrade pip
-pip install ultralytics openvino supervision fastapi "uvicorn[standard]" opencv-python aiofiles websockets
+pip install ultralytics openvino supervision fastapi "uvicorn[standard]" opencv-python aiofiles websockets winotify
 ```
 
 ### 3. Baixar o Gateway de Vídeo (go2rtc)
