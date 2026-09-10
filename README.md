@@ -11,26 +11,32 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
 - **Zero Custo de Nuvem:** Operação 100% offline no seu computador local, sem envio de imagens para serviços externos.
 - **Aceleração Intel OpenVINO:** Inferência ultrarrápida (~30 ms) otimizada para gráficos integrados **Intel Iris Xe** e processadores Intel Core, mantendo o computador frio e consumindo pouca energia.
 - **Streaming WebRTC de Baixa Latência & Alta Fluidez:** Gateway de vídeo integrado via **go2rtc**, servindo WebRTC nativo (25–30 FPS) com aceleração por hardware de vídeo no navegador.
-- **Overlay IA em Tempo Real (60 FPS):** Em vez de reencodar vídeo lento em MJPEG (que causa perda de quadros nos navegadores), o dashboard renderiza o stream nativo WebRTC a 30 FPS e projeta as caixas de detecção e zona de interesse através de uma camada vetorial acelerada por GPU a 60 FPS via WebSocket de baixa latência (<2ms).
-- **Arquitetura Anti-Lag (Zero Buffer Delay):** Leitor de frames desacoplado em thread dedicada que descarta acúmulos de buffer RTSP, garantindo análise instantânea do momento presente.
+- **Overlay IA em Tempo Real (60 FPS):** O dashboard renderiza o stream nativo WebRTC a 30 FPS e projeta as caixas de detecção e zona de interesse através de uma camada vetorial acelerada por GPU a 60 FPS via WebSocket de baixa latência (<2ms).
+- **Indicador de FPS Real no Player:** Badge em tempo real sobreposto ao vídeo com monitoramento contínuo nas 3 abas de transmissão:
+  - ⚡ **Visão IA (WebRTC Fluido):** Medição de FPS da renderização cliente + telemetria do detector.
+  - 📹 **Ao Vivo Puro:** Taxa de quadros do stream WebRTC nativo com aceleração de hardware.
+  - 🎞️ **Feed MJPEG:** Taxa de quadros do stream de buffer do detector.
+- **Modo Tela Cheia (Fullscreen) Nativo:** Botão integrado no player para expandir a transmissão para tela inteira com redimensionamento vetorial dinâmico do overlay e das áreas demarcadas.
+- **Configurações Integradas na Tela Principal com Auto-Save:** Painel de controle diretamente acessível na lateral do vídeo com salvamento automático e feedback visual instantâneo (`✓ Salvo automaticamente`), sem necessidade de modais ou botões manuais.
+- **Painel de Histórico & Gravações em Largura Total:** Bloco de eventos posicionado na parte inferior da interface, oferecendo ampla visibilidade dos clipes gravados com filtros temporais (Hoje, Ontem, 7 Dias, Todas) e player modal.
+- **Contadores de Movimentações por Alvo no Topo:** Barra dinâmica no topo do dashboard com a contagem instantânea de registros do dia agrupados por alvo configurado (**Beatriz**, **Serena**, **Ambos**, **Pessoas**, etc.).
+- **Seleção de Alvos via Checkboxes Múltiplos:** Formato prático de seleção simultânea em caixas de marcação:
+  - `[x] 🧡 Beatriz (Gata Amarela / Laranja)`
+  - `[x] 🩶 Serena (Gata Cinza)`
+  - `[ ] 🐱 Outro Gato / Qualquer Gato`
+  - `[ ] 👤 Pessoas`
+  - `[ ] 🚗 Veículos`
+  - `[ ] 🐶 Cachorros`
+- **Multi-Select de Classes Adicionais (80 Objetos COCO):** Seletor interativo para adicionar objetos extras à busca (como Ônibus, Bicicletas, Mochilas, Pássaros, Barcos, etc.) exibidos em tags dinâmicas removíveis (`[Ônibus ✕]`).
+- **Identificação Individual de Pets (Beatriz vs. Serena):** Reconhecimento cromático em tempo real via análise HSV que identifica quem visitou a área demarcada e grava no histórico (**Beatriz**, **Serena** ou **Ambos**).
+- **Rastreamento Anti-Flicker com Interpolação Lerp:** Elimina caixas piscando ou sumindo entre frames; a caixa acompanha o alvo com interpolação contínua a 60 FPS e persistência de 650ms.
+- **Filtro de Cor Integrado:** Possibilidade de filtrar objetos por cor (ex: detectar e contar **apenas carros brancos**).
+- **Taxa de Quadros Ajustável (FPS):** Controle dinâmico de 2 FPS (máxima economia) até 25 FPS (rastreamento ultra fluido).
+- **Gravação Automática com Conversão Web H.264:** Grava clipes em MP4 das visitas/eventos, converte automaticamente em background para H.264 com `+faststart` (reprodução nativa imediata no navegador sem erros MIME) e persiste no banco **SQLite** local.
 - **Suíte Supervision Completa:**
   - `PolygonZone`: Delimitação precisa de áreas de interesse (caixa de areia, portão, vaga, etc.).
   - `ByteTrack`: Rastreamento contínuo com ID estável para evitar contagens duplicadas.
   - `TraceAnnotator` & `BoxAnnotator`: Rastro de movimento e enquadramento visual.
-- **Multi-Modos de Detecção Selecionáveis:**
-  - 🐱 **Gatos (Todos):** Monitoramento e identificação cromática individual.
-  - 🧡 **Apenas Beatriz:** Filtra e registra apenas a gata amarela/laranja.
-  - 🩶 **Apenas Serena:** Filtra e registra apenas a gata cinza.
-  - 🚗 **Veículos:** Contagem de trânsito (carros, motos, ônibus e caminhões).
-  - 👤 **Pessoas:** Segurança e monitoramento de passagens.
-  - 🐶 **Cachorros** e todas as 80 classes do COCO Dataset.
-- **Identificação Individual de Pets (Beatriz vs. Serena):** Reconhecimento cromático em tempo real via análise HSV que identifica quem visitou a área demarcada e grava no histórico (**Beatriz**, **Serena** ou **Ambos**).
-- **Rastreamento Anti-Flicker com Interpolação Lerp:** Elimina caixas piscando ou sumindo entre frames; a caixa acompanha o animal com deslizamento contínuo a 60 FPS e persistência de 650ms.
-- **Filtro de Cor Integrado:** Possibilidade de filtrar objetos por cor (ex: detectar e contar **apenas carros brancos**).
-- **Taxa de Quadros Ajustável (FPS):** Controle dinâmico de 2 FPS (máxima economia) até 25 FPS (rastreamento ultra fluido).
-- **Buffer de Suavização (Jitter Buffer):** Armazena uma fila contínua de quadros na memória com cadência uniforme para gravações de clipes e compatibilidade de feed.
-- **Gravação Automática com Debounce:** Grava clipes em MP4 das visitas/eventos e salva no banco **SQLite** local.
-- **Dashboard Web Moderno:** Interface visual com abas de transmissão instantânea (**Visão IA Fluida**, **Ao Vivo Puro** e **MJPEG Legado**), métricas ao vivo, histórico com player de vídeo modal e **editor interativo de ROI** para arrastar os vértices da zona diretamente na tela.
 - **Inicialização em 1 Clique:** Scripts `.bat` para ligar e desligar todos os serviços sem complicações.
 
 ---
@@ -48,17 +54,18 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
               ▼ RTSP Local (rtsp://localhost:8554/cat_cam)
 [ Worker Python: Anti-Lag Capture + Supervision + YOLO11n (OpenVINO) ]
     ├── Thread de Leitura: Consome RTSP sem buffer (Zero Latência)
-    ├── Cadência de IA: 15 FPS (Configurável no Dashboard)
-    ├── Detector: YOLO11n acelerado por Intel OpenVINO
+    ├── Cadência de IA: 15–25 FPS (Ajuste dinâmico no Dashboard com Auto-Save)
+    ├── Detector: YOLO11n acelerado por Intel OpenVINO (Classes filtradas dinamicamente)
     ├── Rastreamento: sv.ByteTrack (Persistência do ID do objeto)
     ├── Delimitação Espacial: sv.PolygonZone (Área configurável na tela)
-    ├── Gravação do Evento: Grava clipe MP4 em /data/recordings/
+    ├── Classificação Cromática: Análise HSV em tempo real (Beatriz vs. Serena)
+    ├── Gravação do Evento: Grava clipe MP4 e converte em H.264 Web (+faststart)
     │
     ▼ Evento Finalizado (Debounce de saída)
 [ Banco SQLite (/data/events.db) ]
     ▲
-    │ Consulta de Histórico e Clipes
-[ API FastAPI / Dashboard ] (Exibe Live Stream + Histórico + Player de Clipes + Editor de ROI)
+    │ Consulta de Histórico, Métricas e Clipes
+[ API FastAPI / Dashboard ] (Live Stream + Fullscreen + Contadores + Auto-Save + ROI Interativo)
 ```
 
 ---
@@ -94,8 +101,8 @@ Baixe o executável oficial para Windows da versão mais recente do [go2rtc (Ale
 `bin/go2rtc.exe`
 
 ### 4. Parear a Câmera e Configurar o Stream
-1. No seu celular, instale o aplicativo gratuito oficial **Tuya Smart** (ícone laranja).
-2. Crie uma conta usando seu e-mail e defina uma senha (evite botões de login social para permitir autenticação direta pela API).
+1. No celular, instale o aplicativo gratuito oficial **Tuya Smart** (ícone laranja).
+2. Crie uma conta usando seu e-mail e defina uma senha.
 3. Resete a câmera e pareie-a pelo QR Code no app Tuya Smart na mesma rede Wi-Fi do computador.
 4. Crie seu arquivo de configuração local a partir do exemplo:
    * Copie o arquivo `config/go2rtc.example.yaml` para `config/go2rtc.yaml`.
@@ -132,18 +139,20 @@ Acesse `http://localhost:8000` no seu navegador:
 
 1. **Ajuste da Área de Interesse:**
    * Clique em **`📐 Ajustar Área de Interesse`**.
-   * Arraste os 4 círculos nos cantos sobre a imagem da câmera para contornar a caixa de areia (ou a área da rua/vaga).
+   * Arraste os 4 círculos nos cantos sobre a imagem da câmera para contornar a caixa de areia ou área monitorada.
    * Clique em **`💾 Salvar Área`**.
 
-2. **Configurações da Inteligência Artificial:**
-   * Clique no botão **`⚙️ Configurações da IA`** no topo direito.
-   * Escolha o objeto a ser detectado: **Gatos**, **Carros/Veículos**, **Pessoas**, etc.
-   * Ative filtros de cor se desejar (ex: apenas carros brancos).
-   * Ajuste o slider de FPS (2 a 25 FPS) para calibrar a fluidez do processamento.
+2. **Configuração de Alvos e Auto-Save:**
+   * Diretamente no painel lateral direito, selecione os alvos desejados através dos **Checkboxes** (Beatriz, Serena, Pessoas, Veículos, etc.).
+   * Para incluir outras classes, selecione no menu **Adicionar Outros Itens** (80 classes do COCO) e clique em `➕ Adicionar`.
+   * Ajuste FPS, sensibilidade e debounce. Todas as alterações são salvas automaticamente no mesmo instante.
 
-3. **Histórico e Clipes de Vídeo:**
-   * Toda vez que um objeto entra na zona demarcada e permanece por mais de 3 segundos, um clipe em MP4 é gravado.
-   * Clique no botão **`▶️ Clipe`** em qualquer registro para assistir ao vídeo gravado diretamente no modal da página.
+3. **Modo Tela Cheia:**
+   * Clique no botão **`⛶ Tela Cheia`** no canto inferior direito do vídeo para visualizar em monitor completo.
+
+4. **Histórico e Clipes de Vídeo:**
+   * Toda vez que um objeto configurado entra na zona demarcada e permanece por mais de 3 segundos, um clipe em MP4 H.264 é gravado.
+   * Clique no botão **`▶️ Clipe`** para assistir ao vídeo gravado no próprio navegador.
 
 ---
 
@@ -157,14 +166,14 @@ catcam/
 │   ├── go2rtc.yaml        # Configuração com credenciais locais (ignorado no git)
 │   └── roi_config.json    # Coordenadas da zona de interesse e parâmetros da IA
 ├── backend/
-│   ├── database.py        # Módulo SQLite para persistência do histórico
-│   ├── detector.py        # Worker de visão computacional (OpenVINO + Supervision)
-│   └── main.py            # Servidor FastAPI e rotas de API
+│   ├── database.py        # Módulo SQLite para persistência e agregação do histórico
+│   ├── detector.py        # Worker de visão computacional (OpenVINO + Supervision + HSV)
+│   └── main.py            # Servidor FastAPI, WebSocket e rotas de API
 ├── frontend/
-│   └── index.html         # Dashboard moderno com WebRTC, métricas e canvas ROI
+│   └── index.html         # Dashboard moderno com WebRTC, Fullscreen, Auto-Save e Canvas
 ├── data/
 │   ├── events.db          # Banco de dados SQLite de visitas
-│   └── recordings/        # Clipes gravados em formato MP4
+│   └── recordings/        # Clipes gravados em formato MP4 (H.264)
 └── scripts/
     ├── iniciar_catcam.bat # Script de inicialização automática
     └── parar_catcam.bat   # Script de parada limpa dos processos
@@ -182,3 +191,4 @@ catcam/
 ## 📄 Licença
 
 Este projeto está sob licença MIT. Sinta-se livre para usar, estudar e modificar!
+
