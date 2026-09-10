@@ -933,19 +933,16 @@
           aiCtx.closePath();
 
           if (inZone) {
-            aiCtx.fillStyle = 'rgba(239, 68, 68, 0.20)';
             aiCtx.strokeStyle = '#EF4444';
             aiCtx.shadowColor = '#EF4444';
             aiCtx.shadowBlur = 10;
             aiCtx.lineWidth = 3;
           } else {
-            aiCtx.fillStyle = 'rgba(16, 185, 129, 0.12)';
             aiCtx.strokeStyle = '#10B981';
             aiCtx.shadowColor = '#10B981';
             aiCtx.shadowBlur = 6;
             aiCtx.lineWidth = 2.5;
           }
-          aiCtx.fill();
           aiCtx.stroke();
 
           // Badge indicador no topo da zona
@@ -1285,8 +1282,6 @@
         else ctx.lineTo(x, y);
       });
       ctx.closePath();
-      ctx.fillStyle = 'rgba(99, 102, 241, 0.25)';
-      ctx.fill();
       ctx.strokeStyle = '#6366F1';
       ctx.lineWidth = 3;
       ctx.stroke();
