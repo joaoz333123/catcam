@@ -379,6 +379,47 @@
       color: #FFF;
     }
 
+    /* Painel de Configurações Lateral */
+    .settings-panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .settings-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-card);
+    }
+
+    .chip-saved {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--accent-success);
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 20px;
+      padding: 4px 10px;
+      transition: all 0.3s ease;
+    }
+
+    .chip-saving {
+      color: var(--accent-warning);
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.25);
+    }
+
     /* Painel de Histórico */
     .history-panel {
       background: var(--bg-card);
@@ -624,9 +665,6 @@
         </div>
       </div>
       <div class="header-actions">
-        <button id="btn-open-settings" class="btn btn-outline" onclick="openSettingsModal()">
-          ⚙️ Configurações da IA
-        </button>
         <div id="status-chip" class="chip-indicator">
           <span class="chip-dot"></span>
           <span id="status-chip-text">Conectando...</span>
@@ -713,38 +751,105 @@
         </div>
       </div>
 
-      <!-- Tabela de Histórico -->
-      <div class="history-panel">
-        <div class="history-header">
-          <div style="font-weight: 600; font-size: 16px;">
-            <span>📋 Histórico de Eventos</span>
+      <!-- Painel de Configurações da IA (Direto na Tela Principal com Auto-Save) -->
+      <div class="settings-panel">
+        <div class="settings-panel-header">
+          <div style="font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+            <span>⚙️ Configurações da IA</span>
           </div>
-          <div class="filter-group">
-            <button class="filter-btn active" onclick="setFilter('today', this)">Hoje</button>
-            <button class="filter-btn" onclick="setFilter('yesterday', this)">Ontem</button>
-            <button class="filter-btn" onclick="setFilter('week', this)">7 Dias</button>
-            <button class="filter-btn" onclick="setFilter('all', this)">Todas</button>
-          </div>
+          <span id="auto-save-status" class="chip-saved">✓ Salvo automaticamente</span>
         </div>
+        
+        <div class="settings-grid" style="grid-template-columns: 1fr;">
+          <!-- Modo de Detecção -->
+          <div class="form-group">
+            <label class="form-label">O que a IA deve buscar:</label>
+            <select id="cfg-mode" class="form-select" onchange="onModeChange(); triggerAutoSave();">
+              <option value="cat">🐱 Gatos (Beatriz ou Serena - Qualquer cor)</option>
+              <option value="cat_beatriz">🧡 Apenas Beatriz (Gata Amarela / Laranja)</option>
+              <option value="cat_serena">🩶 Apenas Serena (Gata Cinza)</option>
+              <option value="vehicles">🚗 Carros & Veículos (Trânsito / Rua)</option>
+              <option value="person">👤 Pessoas (Segurança / Entrada)</option>
+              <option value="dog">🐶 Cachorros</option>
+              <option value="all">🌐 Todos os 80 Objetos (COCO Dataset)</option>
+            </select>
+          </div>
 
-        <div class="table-container">
-          <table id="visits-table">
-            <thead>
-              <tr>
-                <th>Início</th>
-                <th>Término</th>
-                <th>Identificação</th>
-                <th>Duração</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="visits-tbody">
-              <tr>
-                <td colspan="5" class="empty-state">Carregando registros...</td>
-              </tr>
-            </tbody>
-          </table>
+          <!-- Filtro Opcional de Cor -->
+          <div class="form-group" id="group-color-filter" style="display: none;">
+            <label class="form-label">Filtro de Cor (Opcional):</label>
+            <select id="cfg-color" class="form-select" onchange="triggerAutoSave()">
+              <option value="none">Qualquer Cor (Sem filtro)</option>
+              <option value="white">⚪ Apenas Branco (ex: Carros Brancos)</option>
+              <option value="black">⚫ Apenas Preto</option>
+              <option value="red">🔴 Apenas Vermelho</option>
+            </select>
+          </div>
+
+          <!-- Taxa de Quadros (FPS) -->
+          <div class="form-group">
+            <label class="form-label">Taxa de Quadros da IA (FPS):</label>
+            <div class="slider-row">
+              <input type="range" id="cfg-fps" min="2" max="25" step="1" value="15" oninput="document.getElementById('val-fps').innerText = this.value + ' FPS'; triggerAutoSave();">
+              <span id="val-fps" class="slider-val">15 FPS</span>
+            </div>
+            <span style="font-size: 11px; color: var(--text-muted);">
+              2 FPS = Econômico • 15–20 FPS = Rastreamento em tempo real ultra fluido.
+            </span>
+          </div>
+
+          <!-- Confiança Mínima -->
+          <div class="form-group">
+            <label class="form-label">Sensibilidade da IA:</label>
+            <div class="slider-row">
+              <input type="range" id="cfg-conf" min="20" max="85" step="5" value="45" oninput="document.getElementById('val-conf').innerText = this.value + '%'; triggerAutoSave();">
+              <span id="val-conf" class="slider-val">45%</span>
+            </div>
+          </div>
+
+          <!-- Debounce de Saída -->
+          <div class="form-group">
+            <label class="form-label">Tolerância de Saída (Debounce):</label>
+            <div class="slider-row">
+              <input type="range" id="cfg-debounce" min="2" max="15" step="1" value="5" oninput="document.getElementById('val-debounce').innerText = this.value + 's'; triggerAutoSave();">
+              <span id="val-debounce" class="slider-val">5s</span>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Tabela de Histórico de Eventos (Largura Total na Parte Inferior) -->
+    <div class="history-panel" style="margin-top: 24px;">
+      <div class="history-header">
+        <div style="font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+          <span>📋 Histórico de Eventos & Gravações</span>
+        </div>
+        <div class="filter-group">
+          <button class="filter-btn active" onclick="setFilter('today', this)">Hoje</button>
+          <button class="filter-btn" onclick="setFilter('yesterday', this)">Ontem</button>
+          <button class="filter-btn" onclick="setFilter('week', this)">7 Dias</button>
+          <button class="filter-btn" onclick="setFilter('all', this)">Todas</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table id="visits-table">
+          <thead>
+            <tr>
+              <th>Início</th>
+              <th>Término</th>
+              <th>Identificação</th>
+              <th>Duração</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="visits-tbody">
+            <tr>
+              <td colspan="5" class="empty-state">Carregando registros...</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -758,78 +863,6 @@
       </div>
       <div class="modal-video-wrapper">
         <video id="modal-video-player" controls preload="metadata" playsinline></video>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal de Configurações da IA -->
-  <div id="settings-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 650px;">
-      <div class="modal-header">
-        <div class="modal-title">⚙️ Configurações da Inteligência Artificial</div>
-        <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
-      </div>
-      
-      <div class="settings-grid">
-        <!-- Modo de Detecção -->
-        <div class="form-group">
-          <label class="form-label">O que a IA deve buscar:</label>
-          <select id="cfg-mode" class="form-select" onchange="onModeChange()">
-            <option value="cat">🐱 Gatos (Beatriz ou Serena - Qualquer cor)</option>
-            <option value="cat_beatriz">🧡 Apenas Beatriz (Gata Amarela / Laranja)</option>
-            <option value="cat_serena">🩶 Apenas Serena (Gata Cinza)</option>
-            <option value="vehicles">🚗 Carros & Veículos (Trânsito / Rua)</option>
-            <option value="person">👤 Pessoas (Segurança / Entrada)</option>
-            <option value="dog">🐶 Cachorros</option>
-            <option value="all">🌐 Todos os 80 Objetos (COCO Dataset)</option>
-          </select>
-        </div>
-
-        <!-- Filtro Opcional de Cor -->
-        <div class="form-group">
-          <label class="form-label">Filtro de Cor (Opcional):</label>
-          <select id="cfg-color" class="form-select">
-            <option value="none">Qualquer Cor (Sem filtro)</option>
-            <option value="white">⚪ Apenas Branco (ex: Carros Brancos)</option>
-            <option value="black">⚫ Apenas Preto</option>
-            <option value="red">🔴 Apenas Vermelho</option>
-          </select>
-        </div>
-
-        <!-- Taxa de Quadros (FPS) -->
-        <div class="form-group" style="grid-column: span 2;">
-          <label class="form-label">Taxa de Quadros da IA (FPS):</label>
-          <div class="slider-row">
-            <input type="range" id="cfg-fps" min="2" max="25" step="1" value="15" oninput="document.getElementById('val-fps').innerText = this.value + ' FPS'">
-            <span id="val-fps" class="slider-val">15 FPS</span>
-          </div>
-          <span style="font-size: 11px; color: var(--text-muted);">
-            2 FPS = Máxima economia de energia • 15–20 FPS = Rastreamento ultra fluido em tempo real.
-          </span>
-        </div>
-
-        <!-- Confiança Mínima -->
-        <div class="form-group">
-          <label class="form-label">Sensibilidade da IA:</label>
-          <div class="slider-row">
-            <input type="range" id="cfg-conf" min="20" max="85" step="5" value="45" oninput="document.getElementById('val-conf').innerText = this.value + '%'">
-            <span id="val-conf" class="slider-val">45%</span>
-          </div>
-        </div>
-
-        <!-- Debounce de Saída -->
-        <div class="form-group">
-          <label class="form-label">Tolerância de Saída (Debounce):</label>
-          <div class="slider-row">
-            <input type="range" id="cfg-debounce" min="2" max="15" step="1" value="5" oninput="document.getElementById('val-debounce').innerText = this.value + 's'">
-            <span id="val-debounce" class="slider-val">5s</span>
-          </div>
-        </div>
-      </div>
-
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-        <button class="btn btn-outline" onclick="closeSettingsModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveAISettings()">💾 Salvar Configurações</button>
       </div>
     </div>
   </div>
@@ -1354,22 +1387,30 @@
       modal.style.display = 'none';
     }
 
-    // Modal de Configurações da IA
-    function openSettingsModal() {
-      document.getElementById('settings-modal').style.display = 'flex';
+    // Auto-Save das Configurações da IA
+    let autoSaveTimeout = null;
+
+    function triggerAutoSave() {
+      const statusEl = document.getElementById('auto-save-status');
+      if (statusEl) {
+        statusEl.innerHTML = '⏳ Salvando...';
+        statusEl.className = 'chip-saved chip-saving';
+      }
+
+      if (autoSaveTimeout) clearTimeout(autoSaveTimeout);
+      autoSaveTimeout = setTimeout(async () => {
+        await saveAISettingsDirect();
+      }, 350);
     }
 
-    function closeSettingsModal() {
-      document.getElementById('settings-modal').style.display = 'none';
-    }
-
-    async function saveAISettings() {
+    async function saveAISettingsDirect() {
       const mode = document.getElementById('cfg-mode').value;
       const color = document.getElementById('cfg-color').value;
       const fps = parseInt(document.getElementById('cfg-fps').value);
       const conf = parseFloat(document.getElementById('cfg-conf').value) / 100.0;
       const debounce = parseInt(document.getElementById('cfg-debounce').value);
 
+      const statusEl = document.getElementById('auto-save-status');
       try {
         const res = await fetch('/api/roi', {
           method: 'POST',
@@ -1384,14 +1425,24 @@
         });
 
         if (res.ok) {
-          closeSettingsModal();
+          if (statusEl) {
+            statusEl.innerHTML = '✓ Salvo automaticamente';
+            statusEl.className = 'chip-saved';
+          }
           loadStatus();
-          alert('Configurações da IA salvas com sucesso!');
         } else {
-          alert('Erro ao salvar configurações.');
+          if (statusEl) {
+            statusEl.innerHTML = '⚠️ Erro ao salvar';
+            statusEl.className = 'chip-saved';
+            statusEl.style.color = 'var(--accent-danger)';
+          }
         }
       } catch (e) {
-        alert('Erro ao conectar ao servidor.');
+        if (statusEl) {
+          statusEl.innerHTML = '⚠️ Falha de conexão';
+          statusEl.className = 'chip-saved';
+          statusEl.style.color = 'var(--accent-danger)';
+        }
       }
     }
 
@@ -1401,7 +1452,10 @@
         if (res.ok) {
           const data = await res.json();
           if (data.polygon) polygon = data.polygon;
-          if (data.target_mode) document.getElementById('cfg-mode').value = data.target_mode;
+          if (data.target_mode) {
+            document.getElementById('cfg-mode').value = data.target_mode;
+            onModeChange();
+          }
           if (data.color_filter) document.getElementById('cfg-color').value = data.color_filter;
           if (data.target_fps) {
             document.getElementById('cfg-fps').value = data.target_fps;
@@ -1529,9 +1583,9 @@
 
     function onModeChange() {
       const mode = document.getElementById('cfg-mode').value;
-      const colorSelect = document.getElementById('cfg-color');
-      if (mode === 'vehicles') {
-        colorSelect.parentElement.style.display = 'flex';
+      const groupColor = document.getElementById('group-color-filter');
+      if (groupColor) {
+        groupColor.style.display = (mode === 'vehicles') ? 'flex' : 'none';
       }
     }
 
