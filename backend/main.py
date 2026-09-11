@@ -1,5 +1,11 @@
 import os
 import sys
+
+# Otimização crítica de CPU: instrui o runtime OpenMP/oneTBB da Intel a suspender threads imediatamente
+# após a inferência (blocktime=0 e wait policy=passive), eliminando 100% do spin-wait (queimava 600% de CPU à toa)
+os.environ["KMP_BLOCKTIME"] = "0"
+os.environ["OMP_WAIT_POLICY"] = "PASSIVE"
+
 import asyncio
 import json
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect

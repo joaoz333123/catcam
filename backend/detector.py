@@ -1,5 +1,11 @@
 import os
 import sys
+
+# Otimização crítica de CPU: instrui o runtime OpenMP/oneTBB da Intel a suspender threads imediatamente
+# após a inferência (blocktime=0 e wait policy=passive), eliminando 100% do spin-wait de CPU
+os.environ["KMP_BLOCKTIME"] = "0"
+os.environ["OMP_WAIT_POLICY"] = "PASSIVE"
+
 import json
 import time
 import threading
@@ -12,6 +18,21 @@ from typing import Optional, Dict, Any, List
 
 import supervision as sv
 from ultralytics import YOLO
+
+# Otimização de concorrência OpenVINO: limita a inferência a 2 threads e desativa CPU pinning
+# Isso garante que a IA nunca sature todos os núcleos da CPU, deixando folga total para o WebRTC e o navegador
+try:
+    import openvino as ov
+    _orig_ov_core_init = ov.Core.__init__
+    def _custom_ov_core_init(self, *args, **kwargs):
+        _orig_ov_core_init(self, *args, **kwargs)
+        try:
+            self.set_property("CPU", {"INFERENCE_NUM_THREADS": 2, "ENABLE_CPU_PINNING": False})
+        except Exception:
+            pass
+    ov.Core.__init__ = _custom_ov_core_init
+except Exception:
+    pass
 
 # Import local database helper
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -214,6 +235,7 @@ class FreshFrameReader(threading.Thread):
         self.new_frame_event = threading.Event()
 
     def run(self):
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp"
         while self.running:
             cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -268,7 +290,7 @@ class CatCamDetector:
         self.polygon_normalized = []
         self.confidence_threshold = 0.45
         self.debounce_seconds = 5
-        self.target_fps = 15
+        self.target_fps = 12
         self.target_mode = "cat"
         self.color_filter = "none"
         self.current_frame_shape = None
@@ -299,7 +321,7 @@ class CatCamDetector:
             "camera_online": False,
             "target_mode": "cat",
             "color_filter": "none",
-            "target_fps": 15,
+            "target_fps": 12,
             "target_cats": self.target_cats,
             "target_presets": self.target_presets,
             "extra_classes": self.extra_classes,
@@ -341,7 +363,7 @@ class CatCamDetector:
                     self.polygon_normalized = data.get("polygon", [[0.2, 0.3], [0.8, 0.3], [0.8, 0.85], [0.2, 0.85]])
                     self.confidence_threshold = data.get("confidence_threshold", 0.45)
                     self.debounce_seconds = data.get("debounce_seconds", 5)
-                    self.target_fps = data.get("target_fps", 15)
+                    self.target_fps = max(5, min(14, int(data.get("target_fps", 12))))
                     self.target_mode = data.get("target_mode", "cat")
                     self.color_filter = data.get("color_filter", "none")
                     self.target_cats = data.get("target_cats", ["beatriz", "serena"])
@@ -379,7 +401,9 @@ class CatCamDetector:
         if debounce is not None:
             self.debounce_seconds = debounce
         if target_fps is not None:
-            self.target_fps = max(1, min(30, target_fps))
+            # Trava protetiva: o stream de hardware da câmera entrega 15 FPS;
+            # limitar a IA a no máximo 14 FPS (ideal 12 FPS) previne saturação de CPU a 100%
+            self.target_fps = max(5, min(14, int(target_fps)))
             self.status["target_fps"] = self.target_fps
         if target_mode is not None:
             self.target_mode = target_mode

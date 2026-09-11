@@ -1196,16 +1196,16 @@
       const badgeDot = document.getElementById('fps-badge-dot');
       if (!badgeText) return;
 
-      const iaFps = (currentDetections && currentDetections.fps) ? currentDetections.fps : 15;
+      const iaFps = (currentDetections && currentDetections.fps) ? currentDetections.fps : 12;
 
       if (currentStreamTab === 'ai_overlay') {
-        badgeText.innerText = `WebRTC: 25 FPS • IA: ${iaFps} FPS`;
+        badgeText.innerText = `WebRTC: Fluido (2K) • IA: ${iaFps} FPS`;
         if (badgeDot) {
           badgeDot.style.background = '#10B981';
           badgeDot.style.boxShadow = '0 0 8px #10B981';
         }
       } else if (currentStreamTab === 'webrtc') {
-        badgeText.innerText = `WebRTC Ao Vivo: 25 FPS`;
+        badgeText.innerText = `WebRTC Ao Vivo: 2K Puro`;
         if (badgeDot) {
           badgeDot.style.background = '#10B981';
           badgeDot.style.boxShadow = '0 0 8px #10B981';
