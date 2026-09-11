@@ -163,28 +163,33 @@ def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
     return True
 
 
-def convert_video_to_h264(filepath: str):
+def convert_video_to_h264(filepath: str, real_fps: Optional[float] = None):
     """
-    Converte o arquivo de vídeo gerado para H.264 (avc1) com moov atom no início (+faststart).
-    Isso é 100% obrigatório para reprodução nativa em navegadores HTML5 (Chrome, Edge, Safari).
+    Converte o arquivo de vídeo gerado para H.264 (avc1) com moov atom no início (+faststart)
+    e sincroniza a taxa real de quadros (real_fps) para que a duração do vídeo corresponda
+    exatamente ao tempo real do evento (sem aceleração ou efeito timelapse).
     """
     def _worker():
         if not os.path.exists(filepath):
             return
         tmp_path = filepath + ".tmp.mp4"
         try:
-            cmd = [
-                "ffmpeg", "-y", "-i", filepath,
+            cmd = ["ffmpeg", "-y"]
+            if real_fps is not None and real_fps > 0:
+                cmd.extend(["-r", f"{real_fps:.3f}"])
+            cmd.extend([
+                "-i", filepath,
                 "-c:v", "libx264",
+                "-r", "25",
                 "-preset", "ultrafast",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 tmp_path
-            ]
+            ])
             res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45)
             if res.returncode == 0 and os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
                 os.replace(tmp_path, filepath)
-                print(f"[Detector] Vídeo convertido para H.264 Web compatível: {os.path.basename(filepath)}")
+                print(f"[Detector] Vídeo sincronizado em velocidade normal 1.0x ({real_fps or 25:.1f} FPS) e convertido para H.264: {os.path.basename(filepath)}")
             elif os.path.exists(tmp_path):
                 os.remove(tmp_path)
         except Exception as e:
@@ -278,6 +283,7 @@ class CatCamDetector:
         self.last_seen_inside_time = 0
         self.current_video_writer = None
         self.current_video_filename = None
+        self.visit_frames_written = 0
         self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
         self.visit_other_counts: Dict[str, int] = collections.defaultdict(int)
         
@@ -530,6 +536,7 @@ class CatCamDetector:
                 if not self.is_visiting:
                     self.is_visiting = True
                     self.visit_start_time = now
+                    self.visit_frames_written = 0
                     self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
                     self.visit_other_counts = collections.defaultdict(int)
                     self.current_video_filename = f"evento_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
@@ -545,6 +552,7 @@ class CatCamDetector:
 
                 if self.current_video_writer is not None:
                     self.current_video_writer.write(frame)
+                    self.visit_frames_written += 1
 
                 if not obj_in_zone and (now_ts - self.last_seen_inside_time > self.debounce_seconds):
                     self.is_visiting = False
@@ -554,6 +562,8 @@ class CatCamDetector:
                     if self.current_video_writer is not None:
                         self.current_video_writer.release()
                         self.current_video_writer = None
+
+                    real_fps = max(1.0, round(self.visit_frames_written / max(1.0, duration), 3))
 
                     b_count = self.visit_cat_counts.get("Beatriz", 0)
                     s_count = self.visit_cat_counts.get("Serena", 0)
@@ -585,8 +595,8 @@ class CatCamDetector:
                             visitor_name=visitor_name
                         )
                         full_video_path = os.path.join(RECORDINGS_DIR, self.current_video_filename)
-                        convert_video_to_h264(full_video_path)
-                        print(f"[Detector] Evento concluído ({duration}s - {visitor_name}). Salvo e disparada conversão H.264 Web.")
+                        convert_video_to_h264(full_video_path, real_fps=real_fps)
+                        print(f"[Detector] Evento concluído ({duration}s, {self.visit_frames_written} frames a {real_fps:.1f} FPS - {visitor_name}). Salvo e sincronizado em velocidade normal.")
                     else:
                         try:
                             os.remove(os.path.join(RECORDINGS_DIR, self.current_video_filename))
