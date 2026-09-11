@@ -1067,7 +1067,7 @@
           <div class="form-group">
             <label class="form-label">Sensibilidade da IA:</label>
             <div class="slider-row">
-              <input type="range" id="cfg-conf" min="20" max="85" step="5" value="45" oninput="document.getElementById('val-conf').innerText = this.value + '%'; triggerAutoSave();">
+              <input type="range" id="cfg-conf" min="15" max="85" step="5" value="45" oninput="document.getElementById('val-conf').innerText = this.value + '%'; triggerAutoSave();">
               <span id="val-conf" class="slider-val">45%</span>
             </div>
           </div>
@@ -1266,20 +1266,28 @@
         const ocx = (ox1 + ox2) / 2;
         const ocy = (oy1 + oy2) / 2;
 
+        // 1. Procura primeiro por match exato de ID do tracker (persistência perfeita)
         let bestMatch = null;
-        let bestDist = 0.22;
+        if (obj.id !== undefined && obj.id !== null) {
+          bestMatch = trackedBoxes.find(tb => tb.id === obj.id);
+        }
 
-        for (const tb of trackedBoxes) {
-          const tcx = (tb.tx1 + tb.tx2) / 2;
-          const tcy = (tb.ty1 + tb.ty2) / 2;
-          const dist = Math.hypot(ocx - tcx, ocy - tcy);
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestMatch = tb;
+        // 2. Se não encontrou por ID, busca por proximidade com raio expandido (0.45 da tela)
+        if (!bestMatch) {
+          let bestDist = 0.45;
+          for (const tb of trackedBoxes) {
+            const tcx = (tb.tx1 + tb.tx2) / 2;
+            const tcy = (tb.ty1 + tb.ty2) / 2;
+            const dist = Math.hypot(ocx - tcx, ocy - tcy);
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestMatch = tb;
+            }
           }
         }
 
         if (bestMatch) {
+          bestMatch.id = (obj.id !== undefined && obj.id !== null) ? obj.id : bestMatch.id;
           bestMatch.tx1 = ox1;
           bestMatch.ty1 = oy1;
           bestMatch.tx2 = ox2;
@@ -1291,7 +1299,7 @@
           bestMatch.lastSeen = now;
         } else {
           trackedBoxes.push({
-            id: obj.id !== undefined ? obj.id : `b_${now}_${idx}`,
+            id: (obj.id !== undefined && obj.id !== null) ? obj.id : `b_${now}_${idx}`,
             x1: ox1,
             y1: oy1,
             x2: ox2,
@@ -1509,19 +1517,21 @@
           aiCtx.restore();
         }
 
-        // 2. Desenha Bounding Boxes com Interpolação Contínua e Anti-Flicker (Lerp 60 FPS)
+        // 2. Desenha Bounding Boxes com Persistência Estável e Interpolação Rápida (Lerp 60 FPS)
         const now = performance.now();
-        trackedBoxes = trackedBoxes.filter(tb => (now - tb.lastSeen) < 700);
+        // Mantém quadros visíveis por até 2.2 segundos (evita sumir em milissegundos)
+        trackedBoxes = trackedBoxes.filter(tb => (now - tb.lastSeen) < 2200);
 
         trackedBoxes.forEach(box => {
-          // Interpolação linear suave (Lerp)
-          box.x1 += (box.tx1 - box.x1) * 0.35;
-          box.y1 += (box.ty1 - box.y1) * 0.35;
-          box.x2 += (box.tx2 - box.x2) * 0.35;
-          box.y2 += (box.ty2 - box.y2) * 0.35;
+          // Interpolação linear ágil (Lerp 0.55) para grudar no animal mesmo em movimento rápido
+          box.x1 += (box.tx1 - box.x1) * 0.55;
+          box.y1 += (box.ty1 - box.y1) * 0.55;
+          box.x2 += (box.tx2 - box.x2) * 0.55;
+          box.y2 += (box.ty2 - box.y2) * 0.55;
 
           const age = now - box.lastSeen;
-          const alpha = age > 350 ? Math.max(0.08, 1 - (age - 350) / 350) : 1.0;
+          // Opacidade sólida 100% até 1.4s; fade out sutil entre 1.4s e 2.2s
+          const alpha = age > 1400 ? Math.max(0.12, 1 - (age - 1400) / 800) : 1.0;
 
           const bx = box.x1 * w;
           const by = box.y1 * h;
@@ -1548,9 +1558,9 @@
           }
 
           aiCtx.strokeStyle = strokeColor;
-          aiCtx.lineWidth = 2.5;
+          aiCtx.lineWidth = 3.0;
           aiCtx.shadowColor = strokeColor;
-          aiCtx.shadowBlur = 8;
+          aiCtx.shadowBlur = 10;
 
           aiCtx.beginPath();
           if (aiCtx.roundRect) {

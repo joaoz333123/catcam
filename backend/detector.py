@@ -251,7 +251,14 @@ class CatCamDetector:
         self.box_annotator = sv.BoxAnnotator(thickness=2)
         self.label_annotator = sv.LabelAnnotator(text_scale=0.5)
         self.trace_annotator = sv.TraceAnnotator(thickness=2)
-        self.tracker = sv.ByteTrack()
+        # ByteTrack com alta persistência para movimentação rápida e sensibilidade aprimorada
+        self.tracker = sv.ByteTrack(
+            track_activation_threshold=0.18,
+            lost_track_buffer=60,
+            minimum_matching_threshold=0.35,
+            minimum_consecutive_frames=1
+        )
+        self.tracker_identities: Dict[int, str] = {}
         
         self.polygon_normalized = []
         self.confidence_threshold = 0.45
@@ -361,6 +368,8 @@ class CatCamDetector:
             self.polygon_normalized = polygon
         if confidence is not None:
             self.confidence_threshold = confidence
+            if hasattr(self, "tracker") and self.tracker is not None:
+                self.tracker.track_activation_threshold = min(0.18, float(confidence))
         if debounce is not None:
             self.debounce_seconds = debounce
         if target_fps is not None:
@@ -624,25 +633,20 @@ class CatCamDetector:
                         x2_p, y2_p = min(infer_w, int(box[2])), min(infer_h, int(box[3]))
                         cat_crop = frame[y1_p:y2_p, x1_p:x2_p]
                         cat_identity = identify_cat_individual(cat_crop, raw_frame)
+
+                        # Memória estável de identidade durante movimentação contínua
+                        if tracker_id is not None:
+                            if "Beatriz" in cat_identity or "Serena" in cat_identity:
+                                self.tracker_identities[tracker_id] = cat_identity
+                            elif tracker_id in self.tracker_identities:
+                                cat_identity = self.tracker_identities[tracker_id]
+
                         current_frame_cats.append(cat_identity)
-
-                        if self.target_cats:
-                            has_b = "beatriz" in self.target_cats
-                            has_s = "serena" in self.target_cats
-                            has_o = "other" in self.target_cats
-                            if "Beatriz" in cat_identity and not has_b:
-                                continue
-                            if "Serena" in cat_identity and not has_s:
-                                continue
-                            if ("Noturno" in cat_identity or cat_identity == "Gato") and not (has_o or (has_b and has_s)):
-                                continue
-
-                        if self.target_mode == "cat_beatriz" and "Beatriz" not in cat_identity:
-                            continue
-                        if self.target_mode == "cat_serena" and "Serena" not in cat_identity:
-                            continue
-
                         name = cat_identity
+
+                        # Limpa cache antigo periodicamente para manter a memória limpa
+                        if len(self.tracker_identities) > 150:
+                            self.tracker_identities.clear()
                     else:
                         name = CLASS_NAMES_PT.get(c_id, f"ID:{c_id}")
 
