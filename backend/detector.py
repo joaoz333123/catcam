@@ -627,26 +627,6 @@ class CatCamDetector:
                         except Exception:
                             pass
 
-            # Anotações visuais da IA
-            annotated_frame = frame.copy()
-            if self.zone_annotator and self.zone:
-                self.zone_annotator.color = sv.Color.from_hex("#EF4444") if obj_in_zone else sv.Color.from_hex("#10B981")
-                annotated_frame = self.zone_annotator.annotate(scene=annotated_frame)
-
-            if obj_count > 0:
-                annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
-                
-                labels = []
-                for class_id, tracker_id, conf in zip(detections.class_id, detections.tracker_id, detections.confidence):
-                    name = CLASS_NAMES_PT.get(int(class_id), f"ID:{class_id}")
-                    if tracker_id is not None:
-                        labels.append(f"{name} #{tracker_id} ({conf:.0%})")
-                    else:
-                        labels.append(f"{name} ({conf:.0%})")
-
-                annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
-                annotated_frame = self.trace_annotator.annotate(scene=annotated_frame, detections=detections)
-
             # Extrai payload de detecção estruturado para o Overlay WebRTC em tempo real
             objects_payload = []
             current_frame_cats = []
@@ -693,6 +673,18 @@ class CatCamDetector:
                         "conf": round(float(conf), 2),
                         "in_zone": inside
                     })
+
+            # Anotações visuais da IA para feed legado MJPEG
+            annotated_frame = frame.copy()
+            if self.zone_annotator and self.zone:
+                self.zone_annotator.color = sv.Color.from_hex("#EF4444") if obj_in_zone else sv.Color.from_hex("#10B981")
+                annotated_frame = self.zone_annotator.annotate(scene=annotated_frame)
+
+            if obj_count > 0:
+                annotated_frame = self.box_annotator.annotate(scene=annotated_frame, detections=detections)
+                labels = [f"{obj['label']} ({obj['conf']:.0%})" for obj in objects_payload]
+                annotated_frame = self.label_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels)
+                annotated_frame = self.trace_annotator.annotate(scene=annotated_frame, detections=detections)
 
             if self.is_visiting and obj_in_zone:
                 for c_name in current_frame_cats:
