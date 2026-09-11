@@ -106,10 +106,10 @@ def identify_cat_individual(crop_bgr: np.ndarray, full_frame_bgr: Optional[np.nd
         if total_pixels == 0:
             return "Gato"
 
-        # Beatriz: Amarelo / Laranja / Ruivo (Hue 8-36, Sat >= 42, Val >= 45, com canal R > B + 20)
-        yellow_hue = (hsv[:,:,0] >= 8) & (hsv[:,:,0] <= 36)
-        yellow_sat_val = (hsv[:,:,1] >= 42) & (hsv[:,:,2] >= 45)
-        red_dominance = (r.astype(int) - b.astype(int)) > 20
+        # Beatriz: Amarelo / Laranja / Ruivo (Calibrado com foto real: Hue 8-34, Sat >= 50, Val >= 48, R > B + 26)
+        yellow_hue = (hsv[:,:,0] >= 8) & (hsv[:,:,0] <= 34)
+        yellow_sat_val = (hsv[:,:,1] >= 50) & (hsv[:,:,2] >= 48)
+        red_dominance = (r.astype(int) - b.astype(int)) > 26
         beatriz_mask = yellow_hue & yellow_sat_val & red_dominance
         beatriz_score = float(np.sum(beatriz_mask)) / total_pixels
 
@@ -126,13 +126,13 @@ def identify_cat_individual(crop_bgr: np.ndarray, full_frame_bgr: Optional[np.nd
         serena_mask = gray_neutral | gray_slate
         serena_score = float(np.sum(serena_mask)) / total_pixels
 
-        # Classificação baseada no perfil predominante da pelagem
-        if serena_score > beatriz_score:
-            return "Serena (Cinza)"
-        elif beatriz_score > 0.22 and beatriz_score > (serena_score * 1.35):
+        # Classificação robusta calibrada para ambas as gatas reais
+        if beatriz_score > 0.20 and beatriz_score > (serena_score * 1.25):
             return "Beatriz (Amarela)"
+        elif serena_score > beatriz_score:
+            return "Serena (Cinza)"
         else:
-            return "Serena (Cinza)" if serena_score >= 0.15 else "Beatriz (Amarela)"
+            return "Beatriz (Amarela)" if beatriz_score >= 0.18 else "Serena (Cinza)"
     except Exception:
         return "Gato"
 
