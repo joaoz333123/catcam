@@ -29,6 +29,6 @@ echo   COPIE O LINK HTTPS ABAIXO PARA ACESSAR NO CELULAR:
 echo ========================================================
 echo.
 
-ssh -o StrictHostKeyChecking=no -p 443 -R0:localhost:8000 a.pinggy.io
+ssh -o StrictHostKeyChecking=no -R 80:localhost:8000 nokey@localhost.run
 
 pause
