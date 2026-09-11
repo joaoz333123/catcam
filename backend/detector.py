@@ -76,39 +76,63 @@ CLASS_NAMES_PT = {
 def identify_cat_individual(crop_bgr: np.ndarray, full_frame_bgr: Optional[np.ndarray] = None) -> str:
     """
     Identifica se o gato recortado é a Beatriz (Amarela/Laranja) ou a Serena (Cinza).
-    Se a câmera estiver em visão noturna (infravermelho monocromático), informa 'Gato (Noturno)'.
+    Calibrado especificamente com as assinaturas cromáticas das fotos reais da Serena:
+    - Serena: Pelagem cinza-ardósia / azul britânico / lilac, caracterizada por tonalidade fria (B >= R - 5),
+      matiz HSV entre 70 e 135 (azul/ardósia) e baixa/média saturação (S <= 100), além de cinza neutro (S <= 40).
+    - Beatriz: Pelagem quente amarela/laranja com forte dominância vermelha (R > B + 20) e matiz quente (Hue 8 a 36).
     """
     if crop_bgr is None or crop_bgr.size == 0:
         return "Gato"
 
-    # Verifica se a imagem geral da câmera está em infravermelho (monocromática)
+    # 1. Verifica se a imagem geral da câmera está em infravermelho (monocromática / visão noturna)
     if full_frame_bgr is not None and full_frame_bgr.size > 0:
-        b, g, r = cv2.split(full_frame_bgr)
-        diff_rg = np.mean(cv2.absdiff(r, g))
-        diff_gb = np.mean(cv2.absdiff(g, b))
+        b_f, g_f, r_f = cv2.split(full_frame_bgr)
+        diff_rg = float(np.mean(cv2.absdiff(r_f, g_f)))
+        diff_gb = float(np.mean(cv2.absdiff(g_f, b_f)))
         if diff_rg < 4.0 and diff_gb < 4.0:
             return "Gato (Noturno)"
 
     try:
-        hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
-        total_pixels = crop_bgr.shape[0] * crop_bgr.shape[1]
+        h, w = crop_bgr.shape[:2]
+        # Ponderação central (core crop) de 10% para evitar interferência do fundo
+        # (ex: armário de madeira marrom/dourado ao lado ou piso)
+        y1, y2 = int(h * 0.10), int(h * 0.90)
+        x1, x2 = int(w * 0.10), int(w * 0.90)
+        core = crop_bgr[y1:y2, x1:x2] if (y2 > y1 and x2 > x1) else crop_bgr
+
+        hsv = cv2.cvtColor(core, cv2.COLOR_BGR2HSV)
+        b, g, r = cv2.split(core)
+        total_pixels = core.shape[0] * core.shape[1]
         if total_pixels == 0:
             return "Gato"
 
-        # Beatriz: Amarelo / Laranja / Ruivo (Hue 8-36, Sat > 38, Val > 45)
-        yellow_mask = cv2.inRange(hsv, np.array([8, 38, 45]), np.array([36, 255, 255]))
-        yellow_pct = np.sum(yellow_mask > 0) / total_pixels
+        # Beatriz: Amarelo / Laranja / Ruivo (Hue 8-36, Sat >= 42, Val >= 45, com canal R > B + 20)
+        yellow_hue = (hsv[:,:,0] >= 8) & (hsv[:,:,0] <= 36)
+        yellow_sat_val = (hsv[:,:,1] >= 42) & (hsv[:,:,2] >= 45)
+        red_dominance = (r.astype(int) - b.astype(int)) > 20
+        beatriz_mask = yellow_hue & yellow_sat_val & red_dominance
+        beatriz_score = float(np.sum(beatriz_mask)) / total_pixels
 
-        # Serena: Cinza (baixa saturação Sat < 40, Val 35-215)
-        gray_mask = cv2.inRange(hsv, np.array([0, 0, 35]), np.array([180, 40, 215]))
-        gray_pct = np.sum(gray_mask > 0) / total_pixels
+        # Serena: Cinza / Azul Ardósia das imagens reais
+        # A) Cinza neutro tradicional (baixa saturação Sat <= 40, Val 35-220)
+        gray_neutral = (hsv[:,:,1] <= 40) & (hsv[:,:,2] >= 35) & (hsv[:,:,2] <= 220)
+        # B) Cinza-azulado / Ardósia característico da pelagem da Serena sob a câmera
+        # (canal azul frio B >= R - 5, Hue 70-135, Sat 15-100, Val 35-225)
+        slate_hue = (hsv[:,:,0] >= 70) & (hsv[:,:,0] <= 135)
+        slate_sat_val = (hsv[:,:,1] >= 15) & (hsv[:,:,1] <= 100) & (hsv[:,:,2] >= 35) & (hsv[:,:,2] <= 225)
+        cool_dominance = (b.astype(int) >= (r.astype(int) - 5))
+        gray_slate = slate_hue & slate_sat_val & cool_dominance
 
-        if yellow_pct > 0.12:
-            return "Beatriz (Amarela)"
-        elif gray_pct > 0.20 and yellow_pct < 0.08:
+        serena_mask = gray_neutral | gray_slate
+        serena_score = float(np.sum(serena_mask)) / total_pixels
+
+        # Classificação baseada no perfil predominante da pelagem
+        if serena_score > beatriz_score:
             return "Serena (Cinza)"
+        elif beatriz_score > 0.22 and beatriz_score > (serena_score * 1.35):
+            return "Beatriz (Amarela)"
         else:
-            return "Beatriz (Amarela)" if yellow_pct > 0.06 else "Serena (Cinza)"
+            return "Serena (Cinza)" if serena_score >= 0.15 else "Beatriz (Amarela)"
     except Exception:
         return "Gato"
 
