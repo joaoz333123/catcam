@@ -945,8 +945,8 @@
         </div>
 
         <div class="player-container">
-          <!-- WebRTC Frame direto do go2rtc (aceleração por hardware H.264, 30 FPS fluido) -->
-          <iframe id="webrtc-player-iframe" src="http://localhost:1984/stream.html?src=cat_cam"></iframe>
+          <!-- WebRTC Frame via Proxy Reverso go2rtc (aceleração por hardware H.264, 30 FPS fluido, 100% compatível local e remoto) -->
+          <iframe id="webrtc-player-iframe" src="/go2rtc/stream.html?src=cat_cam"></iframe>
           
           <!-- Canvas do Overlay IA em tempo real (renderizado a 60 FPS com aceleração de GPU) -->
           <canvas id="ai-overlay-canvas"></canvas>
@@ -1096,6 +1096,52 @@
                 <input type="checkbox" id="cfg-notifications" checked onchange="triggerAutoSave(); handleNotificationToggle(this.checked);">
                 <span class="toggle-slider"></span>
               </label>
+            </div>
+          </div>
+
+          <!-- Notificações no Celular (ntfy.sh) -->
+          <div class="form-group" style="padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div>
+                <label class="form-label" style="margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
+                  <span>📲 Notificações no Celular (ntfy.sh)</span>
+                </label>
+                <span style="font-size: 11px; color: var(--text-muted); display: block;">
+                  Receba alertas com foto e som no seu smartphone fora de casa.
+                </span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-ntfy-enabled" onchange="toggleNtfyFields(this.checked); triggerAutoSave();">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div id="ntfy-settings-box" style="display: none; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-sm); padding: 12px; margin-top: 10px; flex-direction: column; gap: 10px;">
+              <div>
+                <label class="form-label" style="font-size: 12px; margin-bottom: 4px;">Nome do seu Tópico Secreto no ntfy:</label>
+                <div style="display: flex; gap: 6px;">
+                  <input type="text" id="cfg-ntfy-topic" class="form-input" placeholder="ex: catcam-alerta-joao" style="flex: 1; padding: 6px 10px; font-size: 12px;" oninput="triggerAutoSave();">
+                  <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="openNtfyTopicWeb()" title="Abrir tópico no navegador">🌐 Abrir</button>
+                </div>
+                <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">
+                  💡 Baixe o app gratuito <b>ntfy</b> (Android/iOS) e assine este mesmo tópico.
+                </span>
+              </div>
+
+              <div>
+                <label class="form-label" style="font-size: 12px; margin-bottom: 4px;">URL Pública do Streaming (Link do Túnel Cloudflare):</label>
+                <input type="text" id="cfg-public-url" class="form-input" placeholder="https://seu-catcam.trycloudflare.com" style="width: 100%; padding: 6px 10px; font-size: 12px;" oninput="triggerAutoSave();">
+                <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">
+                  Ao tocar na notificação no celular, abrirá a live neste link.
+                </span>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <button type="button" id="btn-test-ntfy" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; width: 100%; justify-content: center;" onclick="testNtfyNotification()">
+                  🔔 Enviar Teste para o Celular
+                </button>
+              </div>
+              <div id="ntfy-test-result" style="font-size: 11px; display: none; text-align: center;"></div>
             </div>
           </div>
         </div>
@@ -2044,6 +2090,9 @@
       const debounce = parseInt(document.getElementById('cfg-debounce').value);
 
       const notifEnabled = document.getElementById('cfg-notifications')?.checked ?? true;
+      const ntfyEnabled = document.getElementById('cfg-ntfy-enabled')?.checked ?? false;
+      const ntfyTopic = document.getElementById('cfg-ntfy-topic')?.value || "";
+      const publicUrl = document.getElementById('cfg-public-url')?.value || "";
 
       const statusEl = document.getElementById('auto-save-status');
       try {
@@ -2058,7 +2107,10 @@
             target_fps: fps,
             confidence_threshold: conf,
             debounce_seconds: debounce,
-            notifications_enabled: notifEnabled
+            notifications_enabled: notifEnabled,
+            ntfy_enabled: ntfyEnabled,
+            ntfy_topic: ntfyTopic,
+            public_url: publicUrl
           })
         });
 
@@ -2081,6 +2133,74 @@
           statusEl.className = 'chip-saved';
           statusEl.style.color = 'var(--accent-danger)';
         }
+      }
+    }
+
+    function toggleNtfyFields(enabled) {
+      const box = document.getElementById('ntfy-settings-box');
+      if (box) box.style.display = enabled ? 'flex' : 'none';
+    }
+
+    function openNtfyTopicWeb() {
+      const topic = document.getElementById('cfg-ntfy-topic')?.value?.trim();
+      if (!topic) {
+        alert('Por favor, digite o nome do seu tópico ntfy primeiro.');
+        return;
+      }
+      window.open(`https://ntfy.sh/${encodeURIComponent(topic)}`, '_blank');
+    }
+
+    async function testNtfyNotification() {
+      const topic = document.getElementById('cfg-ntfy-topic')?.value?.trim();
+      const pubUrl = document.getElementById('cfg-public-url')?.value?.trim() || window.location.origin;
+      const resEl = document.getElementById('ntfy-test-result');
+      const btn = document.getElementById('btn-test-ntfy');
+
+      if (!topic) {
+        alert('Por favor, informe o nome do tópico ntfy antes de testar.');
+        return;
+      }
+
+      if (btn) btn.disabled = true;
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.color = 'var(--text-muted)';
+        resEl.innerText = 'Enviando notificação de teste com foto...';
+      }
+
+      try {
+        const res = await fetch('/api/notifications/test-ntfy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: topic,
+            server: 'https://ntfy.sh',
+            public_url: pubUrl
+          })
+        });
+
+        if (res.ok) {
+          if (resEl) {
+            resEl.style.color = 'var(--accent-success)';
+            resEl.innerText = '✓ Notificação de teste enviada com sucesso! Verifique seu smartphone.';
+          }
+        } else {
+          const err = await res.json();
+          if (resEl) {
+            resEl.style.color = 'var(--accent-danger)';
+            resEl.innerText = `⚠️ Falha ao enviar: ${err.detail || 'Erro desconhecido'}`;
+          }
+        }
+      } catch (e) {
+        if (resEl) {
+          resEl.style.color = 'var(--accent-danger)';
+          resEl.innerText = `⚠️ Erro de rede: ${e.message}`;
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+        setTimeout(() => {
+          if (resEl) resEl.style.display = 'none';
+        }, 6000);
       }
     }
 
@@ -2123,6 +2243,21 @@
           if (data.notifications_enabled !== undefined) {
             const notifToggle = document.getElementById('cfg-notifications');
             if (notifToggle) notifToggle.checked = Boolean(data.notifications_enabled);
+          }
+          if (data.ntfy_enabled !== undefined) {
+            const ntfyToggle = document.getElementById('cfg-ntfy-enabled');
+            if (ntfyToggle) {
+              ntfyToggle.checked = Boolean(data.ntfy_enabled);
+              toggleNtfyFields(ntfyToggle.checked);
+            }
+          }
+          if (data.ntfy_topic) {
+            const inputTopic = document.getElementById('cfg-ntfy-topic');
+            if (inputTopic) inputTopic.value = data.ntfy_topic;
+          }
+          if (data.public_url) {
+            const inputUrl = document.getElementById('cfg-public-url');
+            if (inputUrl) inputUrl.value = data.public_url;
           }
         }
       } catch (e) {

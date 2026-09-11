@@ -29,6 +29,9 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
   - `[ ] 🐶 Cachorros`
 - **Multi-Select de Classes Adicionais (80 Objetos COCO):** Seletor interativo para adicionar objetos extras à busca (como Ônibus, Bicicletas, Mochilas, Pássaros, Barcos, etc.) exibidos em tags dinâmicas removíveis (`[Ônibus ✕]`).
 - **Identificação Individual de Pets (Beatriz vs. Serena):** Reconhecimento cromático em tempo real via análise HSV que identifica quem visitou a área demarcada e grava no histórico (**Beatriz**, **Serena** ou **Ambos**).
+- **Notificações Push com Foto no Celular (ntfy.sh):** Disparo em tempo real de alerta push nativo no seu smartphone (Android/iOS) com a foto anotada do momento exato em que o alvo (Beatriz, Serena, etc.) entrou na área demarcada, com link de toque para abrir a live.
+- **Acesso Remoto Seguro e Gratuito (Cloudflare Tunnel):** Script em 1 clique para acessar a transmissão da Visão IA e todo o painel de qualquer lugar do mundo (4G/Wi-Fi externo) sob HTTPS criptografado, sem abrir portas no roteador.
+- **Proxy Reverso Unificado:** Toda a comunicação de vídeo WebRTC/MSE, WebSockets e API passa por uma única porta (`8000`), garantindo 100% de compatibilidade tanto local quanto remota.
 - **Notificações Imediatas com Balão do Windows & Chime Sonoro:** Disparo instantâneo de alerta sonoro e notificação nativa no canto da tela do Windows assim que qualquer alvo configurado (ex: Beatriz, Serena, Pessoas, etc.) entra na área demarcada, com link direto para o dashboard.
 - **Botão Liga/Desliga de Notificações no Painel:** Chave toggle integrada diretamente no painel de configurações para pausar ou reativar alertas sonoros e notificações a qualquer momento, salvo automaticamente.
 - **Rastreamento Anti-Flicker com Interpolação Lerp:** Elimina caixas piscando ou sumindo entre frames; a caixa acompanha o alvo com interpolação contínua a 60 FPS e persistência de 650ms.
@@ -39,7 +42,7 @@ Projetado para operar com câmeras compatíveis com o ecossistema Tuya (como a *
   - `PolygonZone`: Delimitação precisa de áreas de interesse (caixa de areia, portão, vaga, etc.).
   - `ByteTrack`: Rastreamento contínuo com ID estável para evitar contagens duplicadas.
   - `TraceAnnotator` & `BoxAnnotator`: Rastro de movimento e enquadramento visual.
-- **Inicialização em 1 Clique:** Scripts `.bat` para ligar e desligar todos os serviços sem complicações.
+- **Inicialização em 1 Clique:** Scripts `.bat` para ligar, desligar e iniciar o acesso remoto sem complicações.
 
 ---
 

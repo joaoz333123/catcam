@@ -62,6 +62,37 @@ def send_windows_notification_async(title: str, msg: str):
             print(f"[Notifier] Erro ao disparar toast do Windows: {e}")
     threading.Thread(target=_worker, daemon=True).start()
 
+def send_ntfy_notification_async(title: str, msg: str, image_bytes: Optional[bytes] = None, topic: str = "", server: str = "https://ntfy.sh", click_url: str = ""):
+    if not topic or not topic.strip():
+        return
+    def _worker():
+        try:
+            import requests
+            endpoint = f"{server.rstrip('/')}/{topic.strip()}"
+            headers = {
+                "Title": title.encode("utf-8").decode("latin-1", errors="ignore"),
+                "Priority": "high",
+                "Tags": "cat,warning,camera"
+            }
+            if click_url and click_url.strip():
+                headers["Click"] = click_url.strip()
+            
+            if image_bytes and len(image_bytes) > 0:
+                headers["Filename"] = f"catcam_{int(time.time())}.jpg"
+                headers["Message"] = msg.encode("utf-8").decode("latin-1", errors="ignore")
+                headers["Content-Type"] = "image/jpeg"
+                resp = requests.put(endpoint, data=image_bytes, headers=headers, timeout=10)
+            else:
+                resp = requests.post(endpoint, data=msg.encode("utf-8"), headers=headers, timeout=10)
+            
+            if resp.status_code in (200, 201):
+                print(f"[Notifier] Notificação ntfy enviada com sucesso para '{topic}'!")
+            else:
+                print(f"[Notifier] Resposta ntfy ({resp.status_code}): {resp.text[:120]}")
+        except Exception as e:
+            print(f"[Notifier] Erro ao enviar notificação ntfy: {e}")
+    threading.Thread(target=_worker, daemon=True).start()
+
 CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config", "roi_config.json"))
 MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "yolo11n_openvino_model"))
 RECORDINGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "recordings"))
@@ -313,6 +344,10 @@ class CatCamDetector:
         self.target_presets: List[str] = ["cats"]
         self.extra_classes: List[int] = []
         self.notifications_enabled: bool = True
+        self.ntfy_enabled: bool = False
+        self.ntfy_topic: str = ""
+        self.ntfy_server: str = "https://ntfy.sh"
+        self.public_url: str = ""
         self.last_notification_time: float = 0.0
         self.last_notified_target: str = ""
 
@@ -326,6 +361,10 @@ class CatCamDetector:
             "target_presets": self.target_presets,
             "extra_classes": self.extra_classes,
             "notifications_enabled": self.notifications_enabled,
+            "ntfy_enabled": self.ntfy_enabled,
+            "ntfy_topic": self.ntfy_topic,
+            "ntfy_server": self.ntfy_server,
+            "public_url": self.public_url,
             "detected_count": 0,
             "in_zone_count": 0,
             "object_detected": False,
@@ -370,6 +409,10 @@ class CatCamDetector:
                     self.target_presets = data.get("target_presets", ["cats"])
                     self.extra_classes = data.get("extra_classes", [])
                     self.notifications_enabled = data.get("notifications_enabled", True)
+                    self.ntfy_enabled = data.get("ntfy_enabled", False)
+                    self.ntfy_topic = data.get("ntfy_topic", "")
+                    self.ntfy_server = data.get("ntfy_server", "https://ntfy.sh")
+                    self.public_url = data.get("public_url", "")
 
                     self.status["target_mode"] = self.target_mode
                     self.status["color_filter"] = self.color_filter
@@ -378,6 +421,10 @@ class CatCamDetector:
                     self.status["target_presets"] = self.target_presets
                     self.status["extra_classes"] = self.extra_classes
                     self.status["notifications_enabled"] = self.notifications_enabled
+                    self.status["ntfy_enabled"] = self.ntfy_enabled
+                    self.status["ntfy_topic"] = self.ntfy_topic
+                    self.status["ntfy_server"] = self.ntfy_server
+                    self.status["public_url"] = self.public_url
             self._update_zone()
         except Exception as e:
             print(f"[Detector] Erro ao carregar config ROI: {e}")
@@ -391,7 +438,11 @@ class CatCamDetector:
                         target_cats: Optional[List[str]] = None,
                         target_presets: Optional[List[str]] = None,
                         extra_classes: Optional[List[int]] = None,
-                        notifications_enabled: Optional[bool] = None):
+                        notifications_enabled: Optional[bool] = None,
+                        ntfy_enabled: Optional[bool] = None,
+                        ntfy_topic: Optional[str] = None,
+                        ntfy_server: Optional[str] = None,
+                        public_url: Optional[str] = None):
         if polygon is not None:
             self.polygon_normalized = polygon
         if confidence is not None:
@@ -423,6 +474,18 @@ class CatCamDetector:
         if notifications_enabled is not None:
             self.notifications_enabled = notifications_enabled
             self.status["notifications_enabled"] = self.notifications_enabled
+        if ntfy_enabled is not None:
+            self.ntfy_enabled = ntfy_enabled
+            self.status["ntfy_enabled"] = self.ntfy_enabled
+        if ntfy_topic is not None:
+            self.ntfy_topic = ntfy_topic.strip()
+            self.status["ntfy_topic"] = self.ntfy_topic
+        if ntfy_server is not None:
+            self.ntfy_server = ntfy_server.strip()
+            self.status["ntfy_server"] = self.ntfy_server
+        if public_url is not None:
+            self.public_url = public_url.strip()
+            self.status["public_url"] = self.public_url
 
         data = {
             "polygon": self.polygon_normalized,
@@ -434,7 +497,11 @@ class CatCamDetector:
             "target_cats": self.target_cats,
             "target_presets": self.target_presets,
             "extra_classes": self.extra_classes,
-            "notifications_enabled": self.notifications_enabled
+            "notifications_enabled": self.notifications_enabled,
+            "ntfy_enabled": self.ntfy_enabled,
+            "ntfy_topic": self.ntfy_topic,
+            "ntfy_server": self.ntfy_server,
+            "public_url": self.public_url
         }
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -698,7 +765,11 @@ class CatCamDetector:
                     if obj.get("in_zone") and obj.get("class_id") != 15:
                         self.visit_other_counts[obj.get("name", "Objeto")] += 1
 
-            # Disparo Imediato de Notificação Windows e Som (com cooldown anti-spam)
+            # Codifica com otimização rápida
+            ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            jpeg_bytes = jpeg_buf.tobytes() if ret_jpg else None
+
+            # Disparo Imediato de Notificação Windows, Som e Remota ntfy (com cooldown anti-spam)
             alert_payload = None
             if obj_in_zone and self.notifications_enabled:
                 current_alert_target = None
@@ -721,11 +792,17 @@ class CatCamDetector:
                             title="🚨 Alerta CatCam AI",
                             msg=f"{current_alert_target} detectado(a) na área de interesse!"
                         )
+                        if self.ntfy_enabled and self.ntfy_topic:
+                            send_ntfy_notification_async(
+                                title=f"🚨 Alerta: {current_alert_target} na área!",
+                                msg=f"{current_alert_target} entrou na área de interesse às {now.strftime('%H:%M:%S')}",
+                                image_bytes=jpeg_bytes,
+                                topic=self.ntfy_topic,
+                                server=self.ntfy_server,
+                                click_url=self.public_url or "http://localhost:8000"
+                            )
 
-            # Codifica com otimização rápida
-            ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if ret_jpg:
-                jpeg_bytes = jpeg_buf.tobytes()
+            if jpeg_bytes is not None:
                 with self.lock:
                     self.latest_annotated_jpeg = jpeg_bytes
                     self.frame_buffer.append(jpeg_bytes)
