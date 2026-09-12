@@ -1,11 +1,5 @@
-# MASTER DIRECTIVE: MONITORAMENTO LOCAL DE PET COM SUPERVISION E YOLO11 (100% LOCAL / ZERO CUSTO)
-> **Versão Revisada e Homologada:** Otimizada para Intel Iris Xe (OpenVINO), sem atraso de buffer RTSP, compatível com Python 3.11/3.12 e preparada para usuário iniciante.
-
----
 
 ## 1. OBJETIVO DO AGENTE
-
-Você é o Engenheiro de Software Sênior encarregado de implementar uma plataforma **100% local, autônoma e gratuita** para monitorar o uso da caixa de areia de uma gata. O sistema utiliza a **Positivo Smart Câmera 360° Bot 2ª Geração (OEM Tuya)** com firmware original de fábrica. 
 
 O fluxo opera **sem custos de API, sem nuvem externa e sem chatbot**:
 1. O **go2rtc** atua como gateway de vídeo conectando à câmera Tuya e distribuindo WebRTC (para o navegador) e RTSP (para o processamento).
@@ -28,26 +22,7 @@ O fluxo opera **sem custos de API, sem nuvem externa e sem chatbot**:
   - `8000` — Dashboard Web & Backend FastAPI.
 - **Versão de Python Requerida:** **Python 3.11 ou 3.12** (Versões consolidadas com instaladores binários de PyTorch, OpenCV e OpenVINO, evitando erros de compilação de C++).
 
----
 
-## 3. REGRAS INEGOCIÁVEIS DE DESENVOLVIMENTO
-
-1. **ZERO CUSTO E OPERAÇÃO 100% OFFLINE:**
-   - Proibido qualquer serviço pago de nuvem ou API de LLM (sem OpenAI, sem Gemini). Tudo roda na máquina local.
-2. **VERSÕES ESTÁVEIS E COMPATIBILIDADE PYTHON:**
-   - O ambiente virtual (`.venv`) **deve obrigatoriamente utilizar Python 3.11 ou 3.12**.
-   - O modelo YOLO11n deve ser exportado/executado via **OpenVINO** para aproveitar os gráficos Intel Iris Xe, mantendo o consumo de CPU abaixo de 10%.
-3. **PRESERVAÇÃO DO HARDWARE DA CÂMERA:**
-   - Não alterar ou gravar firmware customizado. A câmera Positivo opera com o firmware original, pareada via aplicativo oficial **Tuya Smart**.
-4. **ARQUITETURA ANTI-ATRASO DE BUFFER (BUFFERLESS CAPTURE):**
-   - No OpenCV, a leitura de RTSP deve ser feita em uma *thread* separada que descarta frames antigos e sempre entrega o frame instantâneo atual. Isso impede que o vídeo do detector acumule minutos de atraso em relação ao tempo real.
-5. **GRAVAÇÃO DE CLIPE FLUIDA:**
-   - Enquanto a inferência da IA roda em cadência econômica (1 a 2 FPS), o clipe MP4 da visita gravado deve ter fluidez adequada (armazenando os frames em taxa correta para não virar um slideshow acelerado).
-6. **ISOLAMENTO E VALIDAÇÃO PASSO A PASSO:**
-   - Todas as bibliotecas ficam dentro de `.venv`.
-   - Cada etapa deve ser validada e testada no terminal antes de avançar para a próxima.
-
----
 
 ## 4. ARQUITETURA TÉCNICA DO SISTEMA
 
@@ -201,18 +176,3 @@ O fluxo opera **sem custos de API, sem nuvem externa e sem chatbot**:
    - **Editor Visual da Zona (ROI):** Canvas sobreposto ao vídeo permitindo arrastar os 4 pontos para ajustar o retângulo da caixa de areia diretamente pela tela.
 
 ---
-
-### ETAPA 6: Automação em 1 Clique (Para Usuário Leigo)
-
-1. **Script de Inicialização (`/scripts/iniciar_catcam.bat`):**
-   - Inicia o `go2rtc.exe` minimizado/segundo plano.
-   - Ativa o ambiente virtual `.venv` e roda o servidor FastAPI + Detector.
-   - Abre o navegador padrão diretamente em `http://localhost:8000`.
-2. **Script de Parada (`/scripts/parar_catcam.bat`):**
-   - Encerra de forma limpa todos os processos em execução com 1 clique.
-
----
-
-## 6. PRÓXIMO PASSO DO AGENTE
-
-Aguardar a validação final do usuário sobre esta diretiva revisada. Quando autorizado, iniciar a **ETAPA 1** (verificação da versão do Python instalada e configuração do ambiente).
