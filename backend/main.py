@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 from typing import List, Optional
 
 # Setup imports
@@ -26,7 +27,21 @@ from backend.detector import detector, CONFIG_PATH, RECORDINGS_DIR, send_ntfy_no
 # Inicializa banco de dados
 init_db()
 
-app = FastAPI(title="CatCam Monitor API", version="2.5.0")
+# Cliente HTTP assíncrono para o Proxy Reverso do go2rtc (Porta 1984)
+go2rtc_client = httpx.AsyncClient(base_url="http://127.0.0.1:1984", timeout=60.0)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Inicialização (Startup)
+    detector.start()
+    print("[Server] Detector e Gateway iniciados no startup do FastAPI.")
+    yield
+    # Encerramento (Shutdown)
+    detector.stop()
+    await go2rtc_client.aclose()
+    print("[Server] Detector e cliente HTTP parados no shutdown do FastAPI.")
+
+app = FastAPI(title="CatCam Monitor API", version="2.5.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,9 +53,6 @@ app.add_middleware(
 
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
 os.makedirs(FRONTEND_DIR, exist_ok=True)
-
-# Cliente HTTP assíncrono para o Proxy Reverso do go2rtc (Porta 1984)
-go2rtc_client = httpx.AsyncClient(base_url="http://127.0.0.1:1984", timeout=60.0)
 
 class ROIUpdateRequest(BaseModel):
     polygon: Optional[List[List[float]]] = None
@@ -62,17 +74,6 @@ class NtfyTestRequest(BaseModel):
     topic: str
     server: Optional[str] = "https://ntfy.sh"
     public_url: Optional[str] = ""
-
-@app.on_event("startup")
-def startup_event():
-    detector.start()
-    print("[Server] Detector e Gateway iniciados no startup do FastAPI.")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    detector.stop()
-    await go2rtc_client.aclose()
-    print("[Server] Detector e cliente HTTP parados no shutdown do FastAPI.")
 
 # ==========================================================
 # PROXY REVERSO GO2RTC (UNIFICAÇÃO DE PORTAS WEBRTC / HTTP / WS)
