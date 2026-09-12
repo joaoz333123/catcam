@@ -1,5 +1,5 @@
 
-## 1. OBJETIVO DO AGENTE
+## 1. Fluxo
 
 O fluxo opera **sem custos de API, sem nuvem externa e sem chatbot**:
 1. O **go2rtc** atua como gateway de vídeo conectando à câmera Tuya e distribuindo WebRTC (para o navegador) e RTSP (para o processamento).
