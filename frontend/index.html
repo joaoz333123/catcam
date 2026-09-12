@@ -1140,6 +1140,35 @@
             </div>
           </div>
 
+          <!-- Bloco de Acesso Online & QR Code Dinâmico para Celular -->
+          <div class="form-group" style="padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <label class="form-label" style="margin-bottom: 0; display: flex; align-items: center; gap: 6px;">
+                <span>🌐 Acesso Online & QR Code</span>
+              </label>
+              <span id="qr-status-indicator" style="font-size: 10px; background: rgba(16, 185, 129, 0.15); color: var(--accent-success); border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 8px; border-radius: 12px; font-weight: 500;">Ao Vivo</span>
+            </div>
+            <span style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; display: block;">
+              Link de transmissão remota para conectar pelo celular de qualquer lugar.
+            </span>
+
+            <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+              <input type="text" id="cfg-public-url" class="form-input" placeholder="https://seu-link-online.com" style="flex: 1; padding: 7px 10px; font-size: 12px;" oninput="updateQRCode(this.value); triggerAutoSave();">
+              <button type="button" id="btn-copy-public-url" class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; white-space: nowrap;" onclick="copyPublicUrl()" title="Copiar link para a área de transferência">📋 Copiar</button>
+              <button type="button" id="btn-open-public-url" class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; white-space: nowrap;" onclick="openPublicUrl()" title="Abrir link em nova aba">🔗 Abrir</button>
+            </div>
+
+            <!-- Card Visual com QR Code Renderizado Dinamicamente -->
+            <div id="public-qr-wrapper" style="background: rgba(11, 15, 25, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px;">
+              <div style="background: #FFFFFF; padding: 8px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); display: inline-flex; align-items: center; justify-content: center;">
+                <img id="public-qr-code-img" src="" alt="QR Code de Acesso" style="width: 140px; height: 140px; display: block; image-rendering: pixelated; border-radius: 4px;" />
+              </div>
+              <div style="font-size: 11px; color: #CBD5E1; display: flex; align-items: center; gap: 5px; font-weight: 500;">
+                <span>📱</span> Aponte a câmera do celular para conectar direto
+              </div>
+            </div>
+          </div>
+
           <!-- Notificações no Celular (ntfy.sh) -->
           <div class="form-group" style="padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
@@ -1169,12 +1198,8 @@
                 </span>
               </div>
 
-              <div>
-                <label class="form-label" style="font-size: 12px; margin-bottom: 4px;">URL Pública do Streaming (Link do Túnel Cloudflare):</label>
-                <input type="text" id="cfg-public-url" class="form-input" placeholder="https://seu-catcam.trycloudflare.com" style="width: 100%; padding: 6px 10px; font-size: 12px;" oninput="triggerAutoSave();">
-                <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">
-                  Ao tocar na notificação no celular, abrirá a live neste link.
-                </span>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
+                💡 Ao tocar nas notificações push no celular, a live abrirá automaticamente na URL Pública configurada acima.
               </div>
 
               <div style="display: flex; gap: 8px; margin-top: 4px;">
@@ -2290,6 +2315,60 @@
       }
     }
 
+    function updateQRCode(url) {
+      const cleanUrl = (url || '').trim();
+      const wrapper = document.getElementById('public-qr-wrapper');
+      const img = document.getElementById('public-qr-code-img');
+      const copyBtn = document.getElementById('btn-copy-public-url');
+      const openBtn = document.getElementById('btn-open-public-url');
+
+      if (!cleanUrl) {
+        if (wrapper) wrapper.style.display = 'none';
+        if (copyBtn) copyBtn.style.display = 'none';
+        if (openBtn) openBtn.style.display = 'none';
+        return;
+      }
+
+      if (wrapper) wrapper.style.display = 'flex';
+      if (copyBtn) copyBtn.style.display = 'inline-flex';
+      if (openBtn) openBtn.style.display = 'inline-flex';
+
+      if (img) {
+        img.src = `/api/qrcode?text=${encodeURIComponent(cleanUrl)}`;
+      }
+    }
+
+    function copyPublicUrl() {
+      const input = document.getElementById('cfg-public-url');
+      const url = input?.value?.trim();
+      if (!url) return;
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('btn-copy-public-url');
+        if (btn) {
+          const original = btn.innerText;
+          btn.innerText = '✓ Copiado!';
+          btn.style.borderColor = 'var(--accent-success)';
+          btn.style.color = 'var(--accent-success)';
+          setTimeout(() => {
+            btn.innerText = original;
+            btn.style.borderColor = '';
+            btn.style.color = '';
+          }, 2000);
+        }
+      }).catch(() => {
+        if (input) {
+          input.select();
+          document.execCommand('copy');
+          alert('Link copiado para a área de transferência!');
+        }
+      });
+    }
+
+    function openPublicUrl() {
+      const url = document.getElementById('cfg-public-url')?.value?.trim();
+      if (url) window.open(url, '_blank');
+    }
+
     function toggleNtfyFields(enabled) {
       const box = document.getElementById('ntfy-settings-box');
       if (box) box.style.display = enabled ? 'flex' : 'none';
@@ -2409,9 +2488,14 @@
             const inputTopic = document.getElementById('cfg-ntfy-topic');
             if (inputTopic) inputTopic.value = data.ntfy_topic;
           }
+          const inputUrl = document.getElementById('cfg-public-url');
           if (data.public_url) {
-            const inputUrl = document.getElementById('cfg-public-url');
             if (inputUrl) inputUrl.value = data.public_url;
+            updateQRCode(data.public_url);
+          } else {
+            const fallback = window.location.origin;
+            if (inputUrl && !inputUrl.value) inputUrl.value = fallback;
+            updateQRCode(inputUrl && inputUrl.value ? inputUrl.value : fallback);
           }
         }
       } catch (e) {

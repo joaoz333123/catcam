@@ -143,6 +143,32 @@ def change_password(payload: ChangePasswordRequest, request: Request = Depends(r
 
     return {"status": "success", "message": "Senha atualizada com sucesso! Faça login novamente com a nova senha."}
 
+@app.get("/api/qrcode")
+def generate_qrcode(text: str = ""):
+    """
+    Gera dinamicamente um QR Code em PNG com alta nitidez e contraste para qualquer URL.
+    """
+    if not text:
+        text = "https://github.com/joaoz333123/catcam"
+    try:
+        import qrcode
+        from io import BytesIO
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=6,
+            border=2,
+        )
+        qr.add_data(text)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return Response(content=buf.getvalue(), media_type="image/png")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar QR Code: {e}")
+
 # ==========================================================
 # PROXY REVERSO GO2RTC (UNIFICAÇÃO DE PORTAS WEBRTC / HTTP / WS)
 # ==========================================================
