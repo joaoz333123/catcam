@@ -170,19 +170,34 @@ Ao abrir o link no celular ou outro computador, a tela de login seguro será exi
 
 ## 🎮 Como Usar
 
-### Inicialização Rápida:
-Execute no terminal ou crie um atalho para:
-```powershell
-# Iniciar o gateway go2rtc
-.\bin\go2rtc.exe -config config\go2rtc.yaml
+### 🌟 Inicialização com Ícone na Bandeja e Atalho no Desktop (Recomendado):
+Basta dar **dois cliques** no atalho criado na sua Área de Trabalho:
+👉 **`CatCam AI Monitor`** (ícone oficial na Área de Trabalho)
 
-# Em outro terminal, iniciar o backend CatCam
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
-```
-Acesse `http://localhost:8000` no seu navegador.
+O que acontece:
+1. Os serviços iniciam em segundo plano de forma 100% silenciosa (sem janela preta de CMD na tela).
+2. O ícone do CatCam aparece na **bandeja do Windows** (ao lado do relógio).
+3. O painel web abre automaticamente no seu navegador.
+4. Ao **clicar com o botão direito** no ícone da bandeja, você pode:
+   - 🌐 **Abrir Painel (Local)**
+   - 📱 **Abrir Link Online (Celular)**
+   - 📋 **Copiar Link de Acesso Remoto**
+   - 📁 **Abrir Pasta de Gravações MP4**
+   - ❌ **Encerrar CatCam** (finaliza tudo de forma limpa)
 
-### Encerrar:
-Basta pressionar `Ctrl+C` nos terminais correspondentes.
+### 📂 Via Scripts `.bat` (Pasta `scripts/`):
+- **Para Iniciar:** Dê dois cliques em **`scripts/iniciar_catcam.bat`**.
+- **Para Encerrar:** Dê dois cliques em **`scripts/parar_catcam.bat`**.
+
+### 🎨 Como Personalizar o Ícone:
+Se desejar alterar o desenho do ícone por uma foto ou ilustração personalizada:
+1. Coloque sua imagem quadrada em formato `.png` ou `.ico` na pasta `assets/` com o nome:
+   - `assets/catcam.png` (usado na bandeja do sistema)
+   - `assets/catcam.ico` (usado no atalho do Desktop)
+2. Para recriar o atalho no Desktop com o novo ícone a qualquer momento, execute no terminal:
+   ```bash
+   .\.venv\Scripts\python.exe scripts/create_shortcut.py
+   ```
 
 ---
 
