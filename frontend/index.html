@@ -895,6 +895,9 @@
             onfocus="this.style.borderColor='#6366F1'"
             onblur="this.style.borderColor='rgba(255, 255, 255, 0.12)'"
           />
+          <div style="margin-top: 8px; font-size: 12px; color: #94A3B8; display: flex; align-items: center; gap: 6px;">
+            <span>💡 Dica:</span> <span style="color: #CBD5E1; font-weight: 500;">mesma que o roteador do celular</span>
+          </div>
         </div>
         <div id="auth-error-msg" style="display: none; color: #EF4444; font-size: 13px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); padding: 8px 12px; border-radius: 8px;"></div>
         <button 
@@ -1293,7 +1296,7 @@
           body: JSON.stringify({ password })
         });
         const data = await res.json();
-        if (res.ok && data.status === 'ok') {
+        if (res.ok) {
           isAuthenticated = true;
           const modal = document.getElementById('auth-modal-overlay');
           if (modal) modal.style.display = 'none';

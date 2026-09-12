@@ -54,6 +54,7 @@ class AuthManager:
     def verify_password(self, password: str) -> bool:
         if not password:
             return False
+        self.load_or_init_auth()
         computed = _hash_password(password, self.salt)
         return hmac.compare_digest(computed, self.password_hash)
 
@@ -65,6 +66,8 @@ class AuthManager:
         self.active_sessions.clear()  # Invalida sessões antigas
         self.save_auth()
         return True
+
+    set_password = set_new_password
 
     def create_session_token(self) -> str:
         token = secrets.token_urlsafe(32)
