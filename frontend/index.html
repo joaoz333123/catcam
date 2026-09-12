@@ -874,6 +874,41 @@
 </head>
 <body>
 
+  <!-- Modal de Autenticação / Senha de Acesso Seguro -->
+  <div id="auth-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(11, 15, 25, 0.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: rgba(18, 24, 38, 0.95); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 20px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(99, 102, 241, 0.2); width: 100%; max-width: 400px; padding: 36px 32px; text-align: center; margin: 20px;">
+      <div style="width: 58px; height: 58px; background: linear-gradient(135deg, #6366F1, #818CF8); border-radius: 16px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);">
+        🔒
+      </div>
+      <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 8px; color: #F8FAFC;">Acesso Restrito</h2>
+      <p style="font-size: 13px; color: #94A3B8; margin-bottom: 24px; line-height: 1.5;">Digite a senha de segurança do CatCam Monitor para acessar as transmissões e controles.</p>
+      
+      <form id="auth-form" onsubmit="handleLoginSubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">
+        <div style="position: relative; text-align: left;">
+          <input 
+            id="auth-password-input" 
+            type="password" 
+            placeholder="Digite a senha..." 
+            autocomplete="current-password"
+            required
+            style="width: 100%; padding: 14px 16px; background: rgba(11, 15, 25, 0.8); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; color: #F8FAFC; font-size: 15px; outline: none; transition: border-color 0.2s;"
+            onfocus="this.style.borderColor='#6366F1'"
+            onblur="this.style.borderColor='rgba(255, 255, 255, 0.12)'"
+          />
+        </div>
+        <div id="auth-error-msg" style="display: none; color: #EF4444; font-size: 13px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); padding: 8px 12px; border-radius: 8px;"></div>
+        <button 
+          id="btn-auth-submit" 
+          type="submit" 
+          class="btn btn-primary" 
+          style="width: 100%; padding: 14px; font-size: 15px; font-weight: 600; justify-content: center; background: #6366F1; border-radius: 12px; cursor: pointer;"
+        >
+          Entrar no CatCam
+        </button>
+      </form>
+    </div>
+  </div>
+
   <div class="container">
     <!-- Header -->
     <header>
@@ -891,6 +926,9 @@
         </div>
         <button id="btn-refresh" class="btn btn-outline" onclick="loadVisits(); loadStatus();">
           🔄 Atualizar
+        </button>
+        <button id="btn-logout" class="btn btn-outline" style="display: none; border-color: rgba(239, 68, 68, 0.35); color: #EF4444;" onclick="logout()">
+          🔒 Sair
         </button>
       </div>
     </header>
@@ -946,7 +984,7 @@
 
         <div class="player-container">
           <!-- WebRTC Frame via Proxy Reverso go2rtc (aceleração por hardware H.264, 30 FPS fluido, 100% compatível local e remoto) -->
-          <iframe id="webrtc-player-iframe" src="/go2rtc/stream.html?src=cat_cam"></iframe>
+          <iframe id="webrtc-player-iframe" src=""></iframe>
           
           <!-- Canvas do Overlay IA em tempo real (renderizado a 60 FPS com aceleração de GPU) -->
           <canvas id="ai-overlay-canvas"></canvas>
@@ -1197,6 +1235,115 @@
   </div>
 
   <script>
+    let isAuthenticated = false;
+    let appServicesInitialized = false;
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json();
+        const modal = document.getElementById('auth-modal-overlay');
+        const logoutBtn = document.getElementById('btn-logout');
+
+        if (data.auth_enabled) {
+          if (data.logged_in) {
+            isAuthenticated = true;
+            if (modal) modal.style.display = 'none';
+            if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+            return true;
+          } else {
+            isAuthenticated = false;
+            if (modal) modal.style.display = 'flex';
+            if (logoutBtn) logoutBtn.style.display = 'none';
+            setTimeout(() => {
+              const passInput = document.getElementById('auth-password-input');
+              if (passInput) passInput.focus();
+            }, 100);
+            return false;
+          }
+        } else {
+          isAuthenticated = true;
+          if (modal) modal.style.display = 'none';
+          return true;
+        }
+      } catch (err) {
+        console.warn('Erro ao checar status de autenticação:', err);
+        return false;
+      }
+    }
+
+    async function handleLoginSubmit(e) {
+      if (e) e.preventDefault();
+      const input = document.getElementById('auth-password-input');
+      const errorDiv = document.getElementById('auth-error-msg');
+      const btn = document.getElementById('btn-auth-submit');
+      if (!input) return;
+
+      const password = input.value;
+      if (!password) return;
+
+      btn.disabled = true;
+      btn.innerText = 'Verificando...';
+      if (errorDiv) errorDiv.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'ok') {
+          isAuthenticated = true;
+          const modal = document.getElementById('auth-modal-overlay');
+          if (modal) modal.style.display = 'none';
+          const logoutBtn = document.getElementById('btn-logout');
+          if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+          input.value = '';
+          initAppServices();
+        } else {
+          if (errorDiv) {
+            errorDiv.innerText = data.detail || 'Senha incorreta. Tente novamente.';
+            errorDiv.style.display = 'block';
+          }
+        }
+      } catch (err) {
+        if (errorDiv) {
+          errorDiv.innerText = 'Erro de comunicação ao validar a senha.';
+          errorDiv.style.display = 'block';
+        }
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Entrar no CatCam';
+      }
+    }
+
+    async function logout() {
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+      } catch (e) {}
+      window.location.reload();
+    }
+
+    function initAppServices() {
+      if (appServicesInitialized) return;
+      appServicesInitialized = true;
+
+      // Iniciar WebRTC Stream
+      const iframe = document.getElementById('webrtc-player-iframe');
+      if (iframe && (!iframe.src || iframe.src === 'about:blank' || iframe.src.endsWith('/'))) {
+        iframe.src = '/go2rtc/stream.html?src=cat_cam';
+      }
+
+      loadStatus();
+      loadVisits();
+      loadROIConfig();
+      connectDetectionWS();
+      requestAnimationFrame(renderAIOverlay);
+      setInterval(loadStatus, 2000);
+      setInterval(loadVisits, 10000);
+    }
+
     let currentFilter = 'today';
     let roiEditing = false;
     let polygon = [
@@ -1566,6 +1713,7 @@
 
     let wsDetections = null;
     function connectDetectionWS() {
+      if (!isAuthenticated) return;
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host || 'localhost:8000';
       const wsUrl = `${protocol}//${host}/ws/detections`;
@@ -1586,18 +1734,19 @@
           } catch (err) {}
         };
         wsDetections.onclose = () => {
-          setTimeout(connectDetectionWS, 1500);
+          if (isAuthenticated) setTimeout(connectDetectionWS, 1500);
         };
         wsDetections.onerror = () => {
           wsDetections.close();
         };
       } catch (e) {
-        setTimeout(connectDetectionWS, 2000);
+        if (isAuthenticated) setTimeout(connectDetectionWS, 2000);
       }
     }
 
     // Polling de fallback caso o WebSocket esteja desconectado
     setInterval(async () => {
+      if (!isAuthenticated) return;
       if (!wsDetections || wsDetections.readyState !== WebSocket.OPEN) {
         try {
           const res = await fetch('/api/detections');
@@ -1781,6 +1930,7 @@
     async function loadStatus() {
       try {
         const res = await fetch('/api/status');
+        if (res.status === 401) { checkAuth(); return; }
         if (!res.ok) return;
         const data = await res.json();
         
@@ -1866,6 +2016,7 @@
       try {
         const url = currentFilter === 'all' ? '/api/visits' : `/api/visits?range=${currentFilter}`;
         const res = await fetch(url);
+        if (res.status === 401) { checkAuth(); return; }
         if (!res.ok) return;
         const visits = await res.json();
         
@@ -2370,15 +2521,12 @@
       }
     }
 
-    window.addEventListener('load', () => {
+    window.addEventListener('load', async () => {
       populateExtraClassesSelect();
-      loadStatus();
-      loadVisits();
-      loadROIConfig();
-      connectDetectionWS();
-      requestAnimationFrame(renderAIOverlay);
-      setInterval(loadStatus, 2000);
-      setInterval(loadVisits, 10000);
+      const authed = await checkAuth();
+      if (authed) {
+        initAppServices();
+      }
     });
 
     function togglePlayerFullscreen() {

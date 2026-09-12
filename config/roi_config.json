@@ -1,25 +1,25 @@
 {
   "polygon": [
     [
-      0.8936530410486822,
-      0.7150753922198885
+      0.25,
+      0.35
     ],
     [
-      0.24767278716997973,
-      0.9989949902098383
+      0.75,
+      0.35
     ],
     [
-      0.21100141904586125,
-      0.2628140856872252
+      0.75,
+      0.85
     ],
     [
-      0.6891396418949445,
-      0.25778896005908447
+      0.25,
+      0.85
     ]
   ],
-  "confidence_threshold": 0.15,
-  "debounce_seconds": 15,
-  "target_fps": 6,
+  "confidence_threshold": 0.35,
+  "debounce_seconds": 5,
+  "target_fps": 12,
   "target_mode": "cat",
   "color_filter": "none",
   "target_cats": [
@@ -30,9 +30,10 @@
   "target_presets": [
     "cats"
   ],
-  "extra_classes": [
-    5,
-    2
-  ],
-  "notifications_enabled": true
+  "extra_classes": [],
+  "notifications_enabled": true,
+  "ntfy_enabled": false,
+  "ntfy_topic": "catcam_alerts",
+  "ntfy_server": "https://ntfy.sh",
+  "public_url": ""
 }

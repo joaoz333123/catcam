@@ -10,19 +10,21 @@ import asyncio
 import json
 import httpx
 import websockets
+from contextlib import asynccontextmanager
+from typing import List, Optional
+
 from starlette.background import BackgroundTask
-from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
-from contextlib import asynccontextmanager
-from typing import List, Optional
 
 # Setup imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from backend.database import init_db, get_visits, delete_visit, get_visits_breakdown
 from backend.detector import detector, CONFIG_PATH, RECORDINGS_DIR, send_ntfy_notification_async
+from backend.auth import auth_manager, require_auth, verify_ws_auth
 
 # Inicializa banco de dados
 init_db()
@@ -41,7 +43,7 @@ async def lifespan(app: FastAPI):
     await go2rtc_client.aclose()
     print("[Server] Detector e cliente HTTP parados no shutdown do FastAPI.")
 
-app = FastAPI(title="CatCam Monitor API", version="2.5.0", lifespan=lifespan)
+app = FastAPI(title="CatCam Monitor API", version="2.6.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,6 +55,13 @@ app.add_middleware(
 
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
 os.makedirs(FRONTEND_DIR, exist_ok=True)
+
+class LoginRequest(BaseModel):
+    password: str
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 class ROIUpdateRequest(BaseModel):
     polygon: Optional[List[List[float]]] = None
@@ -76,16 +85,77 @@ class NtfyTestRequest(BaseModel):
     public_url: Optional[str] = ""
 
 # ==========================================================
+# ENDPOINTS DE AUTENTICAÇÃO
+# ==========================================================
+
+@app.get("/api/auth/status")
+def get_auth_status(request: Request):
+    """
+    Retorna se a autenticação está ativa e se o cliente atual possui sessão válida.
+    """
+    token = request.cookies.get("catcam_session") or request.headers.get("X-Session-Token")
+    logged_in = auth_manager.is_session_valid(token) if auth_manager.auth_enabled else True
+    return {
+        "auth_enabled": auth_manager.auth_enabled,
+        "logged_in": logged_in
+    }
+
+@app.post("/api/login")
+def login(payload: LoginRequest, response: Response):
+    """
+    Valida a senha no servidor (Python). Nunca exposta ao frontend.
+    """
+    if not auth_manager.verify_password(payload.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Senha incorreta. Acesso negado."
+        )
+
+    token = auth_manager.create_session_token()
+    # Define cookie de sessão seguro (HttpOnly, sem risco de roubo via XSS/script)
+    response.set_cookie(
+        key="catcam_session",
+        value=token,
+        max_age=30 * 86400,  # Válido por 30 dias
+        httponly=True,
+        samesite="lax"
+    )
+    return {"status": "success", "message": "Login realizado com sucesso!", "token": token}
+
+@app.post("/api/logout")
+def logout(request: Request, response: Response):
+    token = request.cookies.get("catcam_session") or request.headers.get("X-Session-Token")
+    auth_manager.revoke_session(token)
+    response.delete_cookie(key="catcam_session")
+    return {"status": "success", "message": "Sessão encerrada."}
+
+@app.post("/api/auth/change-password")
+def change_password(payload: ChangePasswordRequest, request: Request = Depends(require_auth)):
+    if not auth_manager.verify_password(payload.old_password):
+        raise HTTPException(status_code=400, detail="Senha atual incorreta.")
+    
+    if len(payload.new_password.strip()) < 4:
+        raise HTTPException(status_code=400, detail="A nova senha deve ter no mínimo 4 caracteres.")
+
+    success = auth_manager.set_new_password(payload.new_password)
+    if not success:
+        raise HTTPException(status_code=500, detail="Erro ao atualizar senha.")
+
+    return {"status": "success", "message": "Senha atualizada com sucesso! Faça login novamente com a nova senha."}
+
+# ==========================================================
 # PROXY REVERSO GO2RTC (UNIFICAÇÃO DE PORTAS WEBRTC / HTTP / WS)
 # ==========================================================
 
 @app.websocket("/go2rtc/api/ws")
 async def websocket_go2rtc_proxy(client_ws: WebSocket):
     """
-    Ponte WebSocket bidirecional para o go2rtc:
-    Permite que conexões WebRTC e streams MSE funcionem transparentemente através da porta 8000
-    e através de túneis HTTPS/WSS (Cloudflare Tunnel).
+    Ponte WebSocket bidirecional para o go2rtc com verificação de autenticação.
     """
+    if not verify_ws_auth(client_ws):
+        await client_ws.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await client_ws.accept()
     query = client_ws.scope.get("query_string", b"").decode("utf-8")
     target_url = "ws://127.0.0.1:1984/api/ws"
@@ -127,9 +197,9 @@ async def websocket_go2rtc_proxy(client_ws: WebSocket):
             pass
 
 @app.api_route("/go2rtc/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"])
-async def go2rtc_http_proxy(path: str, request: Request):
+async def go2rtc_http_proxy(path: str, request: Request, authorized: bool = Depends(require_auth)):
     """
-    Proxy Reverso HTTP transparente para arquivos estáticos e API do go2rtc (stream.html, video-rtc.js, etc.)
+    Proxy Reverso HTTP transparente protegido por autenticação.
     """
     url = f"/{path}"
     query = request.url.query
@@ -163,11 +233,11 @@ async def go2rtc_http_proxy(path: str, request: Request):
         return Response(f"Erro no gateway de vídeo local: {e}", status_code=502)
 
 # ==========================================================
-# ENDPOINTS DA API CATCAM
+# ENDPOINTS DA API CATCAM (PROTEGIDOS POR SENHA)
 # ==========================================================
 
 @app.get("/api/status")
-def get_status():
+def get_status(authorized: bool = Depends(require_auth)):
     visits_today = get_visits(filter_range="today", limit=100)
     total_today = len(visits_today)
     avg_duration = round(sum(v["duration_seconds"] for v in visits_today) / total_today) if total_today > 0 else 0
@@ -183,18 +253,18 @@ def get_status():
     }
 
 @app.get("/api/visits")
-def list_visits(range: Optional[str] = None, limit: int = 50):
+def list_visits(range: Optional[str] = None, limit: int = 50, authorized: bool = Depends(require_auth)):
     return get_visits(filter_range=range, limit=limit)
 
 @app.delete("/api/visits/{visit_id}")
-def remove_visit(visit_id: int):
+def remove_visit(visit_id: int, authorized: bool = Depends(require_auth)):
     success = delete_visit(visit_id)
     if not success:
         raise HTTPException(status_code=404, detail="Visita não encontrada.")
     return {"status": "success", "deleted_id": visit_id}
 
 @app.get("/api/roi")
-def get_roi():
+def get_roi(authorized: bool = Depends(require_auth)):
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -202,7 +272,7 @@ def get_roi():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/roi")
-def update_roi(payload: ROIUpdateRequest):
+def update_roi(payload: ROIUpdateRequest, authorized: bool = Depends(require_auth)):
     try:
         detector.save_roi_config(
             polygon=payload.polygon,
@@ -225,7 +295,7 @@ def update_roi(payload: ROIUpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/notifications/test-ntfy")
-def test_ntfy_notification(payload: NtfyTestRequest):
+def test_ntfy_notification(payload: NtfyTestRequest, authorized: bool = Depends(require_auth)):
     if not payload.topic or not payload.topic.strip():
         raise HTTPException(status_code=400, detail="O tópico do ntfy é obrigatório.")
     
@@ -241,11 +311,15 @@ def test_ntfy_notification(payload: NtfyTestRequest):
     return {"status": "success", "message": f"Notificação de teste enviada para o tópico '{payload.topic}'!"}
 
 @app.get("/api/detections")
-def get_detections():
+def get_detections(authorized: bool = Depends(require_auth)):
     return detector.get_latest_ai_payload()
 
 @app.websocket("/ws/detections")
 async def websocket_detections(websocket: WebSocket):
+    if not verify_ws_auth(websocket):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await websocket.accept()
     last_ts = 0.0
     try:
@@ -260,14 +334,14 @@ async def websocket_detections(websocket: WebSocket):
         pass
 
 @app.get("/api/feed/annotated")
-def stream_annotated():
+def stream_annotated(authorized: bool = Depends(require_auth)):
     return StreamingResponse(
         detector.generate_smooth_stream(),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
 @app.api_route("/api/recordings/{filename}", methods=["GET", "HEAD"])
-def get_recording(filename: str):
+def get_recording(filename: str, authorized: bool = Depends(require_auth)):
     filepath = os.path.join(RECORDINGS_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Arquivo de gravação não encontrado.")
