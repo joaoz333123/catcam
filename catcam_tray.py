@@ -61,6 +61,39 @@ class CatCamTrayApp:
             except Exception:
                 pass
 
+    def notify_public_url(self, url: str):
+        if not url:
+            return
+        def _send():
+            try:
+                import urllib.request
+                if not os.path.exists(CONFIG_FILE):
+                    return
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                
+                if not cfg.get("ntfy_enabled", False):
+                    return
+                topic = cfg.get("ntfy_topic", "").strip()
+                server = cfg.get("ntfy_server", "https://ntfy.sh").strip()
+                if not topic:
+                    return
+
+                endpoint = f"{server.rstrip('/')}/{topic}"
+                msg = f"🐱 CatCam Online!\n\nLink de acesso remoto atualizado:\n{url}\n\nToque para abrir no navegador."
+                headers = {
+                    "Title": "CatCam - Link de Acesso Remoto".encode("utf-8").decode("latin-1", errors="ignore"),
+                    "Priority": "high",
+                    "Tags": "globe_with_meridians,cat,link",
+                    "Click": url
+                }
+                req = urllib.request.Request(endpoint, data=msg.encode("utf-8"), headers=headers, method="POST")
+                urllib.request.urlopen(req, timeout=10)
+            except Exception:
+                pass
+
+        threading.Thread(target=_send, daemon=True).start()
+
     def is_port_in_use(self, port: int) -> bool:
         import socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -118,9 +151,12 @@ class CatCamTrayApp:
                         if "http://" in part or "https://" in part:
                             clean = part.strip().rstrip(",.")
                             if "https://" in clean:
+                                is_new = (clean != self.public_url)
                                 self.public_url = clean
                                 self.save_public_url_to_config(clean)
                                 self._update_tray_menu()
+                                if is_new:
+                                    self.notify_public_url(clean)
                                 break
         except Exception:
             pass
