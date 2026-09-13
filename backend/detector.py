@@ -364,6 +364,7 @@ class CatCamDetector:
         self.current_video_filename = None
         self.visit_frames_written = 0
         self.visit_alert_sent = False
+        self.visit_thumbnail_jpeg: Optional[bytes] = None
         self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
         self.visit_other_counts: Dict[str, int] = collections.defaultdict(int)
         
@@ -670,6 +671,7 @@ class CatCamDetector:
                     self.visit_start_time = now
                     self.visit_frames_written = 0
                     self.visit_alert_sent = False
+                    self.visit_thumbnail_jpeg = None
                     self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
                     self.visit_other_counts = collections.defaultdict(int)
                     self.current_video_filename = f"evento_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
@@ -729,10 +731,19 @@ class CatCamDetector:
                             video_filename=self.current_video_filename,
                             visitor_name=visitor_name
                         )
+                        thumb_path = os.path.join(RECORDINGS_DIR, self.current_video_filename.replace(".mp4", ".jpg"))
+                        if self.visit_thumbnail_jpeg is not None:
+                            try:
+                                with open(thumb_path, "wb") as f:
+                                    f.write(self.visit_thumbnail_jpeg)
+                            except Exception:
+                                pass
+                        self.visit_thumbnail_jpeg = None
                         full_video_path = os.path.join(RECORDINGS_DIR, self.current_video_filename)
                         convert_video_to_h264(full_video_path, real_fps=real_fps)
                         print(f"[Detector] Evento concluído ({duration}s, {self.visit_frames_written} frames a {real_fps:.1f} FPS - {visitor_name}). Salvo e sincronizado em velocidade normal.")
                     else:
+                        self.visit_thumbnail_jpeg = None
                         try:
                             os.remove(os.path.join(RECORDINGS_DIR, self.current_video_filename))
                         except Exception:
@@ -812,6 +823,10 @@ class CatCamDetector:
             # Codifica com otimização rápida
             ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             jpeg_bytes = jpeg_buf.tobytes() if ret_jpg else None
+
+            if self.is_visiting and obj_in_zone and jpeg_bytes is not None:
+                if self.visit_thumbnail_jpeg is None or self.visit_frames_written == 10:
+                    self.visit_thumbnail_jpeg = jpeg_bytes
 
             # Disparo Imediato de Notificação Windows, Som e Remota ntfy (com anti-spam rigoroso)
             alert_payload = None

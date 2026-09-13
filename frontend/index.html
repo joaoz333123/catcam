@@ -619,6 +619,211 @@
       font-size: 14px;
     }
 
+    /* Visualização de Vídeos Estilo YouTube */
+    .view-toggle-group {
+      display: flex;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 3px;
+      border-radius: 8px;
+      gap: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .view-toggle-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .view-toggle-btn.active {
+      background: var(--accent-primary);
+      color: #FFF;
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+    }
+
+    .yt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .yt-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s, border-color 0.22s;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .yt-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(99, 102, 241, 0.5);
+      box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(99, 102, 241, 0.25);
+    }
+
+    .yt-thumb-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #020617;
+      overflow: hidden;
+    }
+
+    .yt-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.35s ease;
+    }
+
+    .yt-card:hover .yt-thumb-img {
+      transform: scale(1.05);
+    }
+
+    .yt-play-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .yt-card:hover .yt-play-overlay {
+      opacity: 1;
+    }
+
+    .yt-play-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: rgba(99, 102, 241, 0.92);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      padding-left: 3px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+      transform: scale(0.9);
+      transition: transform 0.2s ease;
+    }
+
+    .yt-card:hover .yt-play-icon {
+      transform: scale(1);
+    }
+
+    .yt-duration-badge {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    .yt-badge-tag {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    .yt-details {
+      padding: 12px 14px;
+      display: flex;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .yt-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .yt-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .yt-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #F8FAFC;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .yt-author {
+      font-size: 12px;
+      color: #94A3B8;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .yt-time-info {
+      font-size: 11px;
+      color: #64748B;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .yt-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 14px 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      gap: 8px;
+    }
+
     /* Modal Genérico */
     .modal-overlay {
       position: fixed;
@@ -1228,24 +1433,44 @@
       </div>
     </div>
 
-    <!-- Tabela de Histórico de Eventos (Largura Total na Parte Inferior) -->
+    <!-- Painel de Gravações & Histórico de Eventos (Estilo YouTube) -->
     <div class="history-panel" style="margin-top: 24px;">
       <div class="history-header">
         <div style="font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-          <span>📋 Histórico de Eventos & Gravações</span>
+          <span>🎬 Galeria de Gravações & Eventos</span>
+          <span id="visits-total-count" style="font-size: 11px; padding: 2px 8px; border-radius: 12px; background: rgba(99, 102, 241, 0.15); color: var(--accent-primary); border: 1px solid rgba(99, 102, 241, 0.3);">Carregando...</span>
         </div>
-        <div class="filter-group">
-          <button class="filter-btn active" onclick="setFilter('today', this)">Hoje</button>
-          <button class="filter-btn" onclick="setFilter('yesterday', this)">Ontem</button>
-          <button class="filter-btn" onclick="setFilter('week', this)">7 Dias</button>
-          <button class="filter-btn" onclick="setFilter('all', this)">Todas</button>
+        
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div class="view-toggle-group">
+            <button id="view-mode-grid" class="view-toggle-btn active" onclick="setViewMode('grid')" title="Visualização em Grade estilo YouTube">
+              ⊞ Grade YouTube
+            </button>
+            <button id="view-mode-table" class="view-toggle-btn" onclick="setViewMode('table')" title="Visualização em Tabela clássica">
+              ☰ Tabela
+            </button>
+          </div>
+
+          <div class="filter-group">
+            <button class="filter-btn active" onclick="setFilter('today', this)">Hoje</button>
+            <button class="filter-btn" onclick="setFilter('yesterday', this)">Ontem</button>
+            <button class="filter-btn" onclick="setFilter('week', this)">7 Dias</button>
+            <button class="filter-btn" onclick="setFilter('all', this)">Todas</button>
+          </div>
         </div>
       </div>
 
-      <div class="table-container">
+      <!-- Grade Estilo YouTube -->
+      <div id="yt-video-grid" class="yt-grid">
+        <div class="empty-state" style="grid-column: 1 / -1;">Carregando gravações com miniaturas...</div>
+      </div>
+
+      <!-- Tabela Clássica (Opcional) -->
+      <div id="visits-table-container" class="table-container" style="display: none;">
         <table id="visits-table">
           <thead>
             <tr>
+              <th>Miniatura</th>
               <th>Início</th>
               <th>Término</th>
               <th>Identificação</th>
@@ -1255,7 +1480,7 @@
           </thead>
           <tbody id="visits-tbody">
             <tr>
-              <td colspan="5" class="empty-state">Carregando registros...</td>
+              <td colspan="6" class="empty-state">Carregando registros...</td>
             </tr>
           </tbody>
         </table>
@@ -1377,6 +1602,7 @@
         iframe.src = '/go2rtc/stream.html?src=cat_cam';
       }
 
+      setViewMode(currentViewMode);
       loadStatus();
       loadVisits();
       loadROIConfig();
@@ -1384,6 +1610,30 @@
       requestAnimationFrame(renderAIOverlay);
       setInterval(loadStatus, 2000);
       setInterval(loadVisits, 10000);
+    }
+
+    let currentViewMode = localStorage.getItem('catcam_view_mode') || 'grid';
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      localStorage.setItem('catcam_view_mode', mode);
+      
+      const btnGrid = document.getElementById('view-mode-grid');
+      const btnTable = document.getElementById('view-mode-table');
+      const gridEl = document.getElementById('yt-video-grid');
+      const tableEl = document.getElementById('visits-table-container');
+
+      if (mode === 'grid') {
+        if (btnGrid) btnGrid.classList.add('active');
+        if (btnTable) btnTable.classList.remove('active');
+        if (gridEl) gridEl.style.display = 'grid';
+        if (tableEl) tableEl.style.display = 'none';
+      } else {
+        if (btnGrid) btnGrid.classList.remove('active');
+        if (btnTable) btnTable.classList.add('active');
+        if (gridEl) gridEl.style.display = 'none';
+        if (tableEl) tableEl.style.display = 'block';
+      }
     }
 
     let currentFilter = 'today';
@@ -2054,6 +2304,13 @@
       }
     }
 
+    function formatVideoDuration(seconds) {
+      if (!seconds || seconds <= 0) return '0:00';
+      const m = Math.floor(seconds / 60);
+      const s = String(seconds % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
     async function loadVisits() {
       try {
         const url = currentFilter === 'all' ? '/api/visits' : `/api/visits?range=${currentFilter}`;
@@ -2062,57 +2319,173 @@
         if (!res.ok) return;
         const visits = await res.json();
         
+        const countEl = document.getElementById('visits-total-count');
+        const gridEl = document.getElementById('yt-video-grid');
         const tbody = document.getElementById('visits-tbody');
+
         if (!visits || visits.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Nenhum evento registrado neste período.</td></tr>';
+          if (countEl) countEl.innerText = '0 vídeos';
+          if (gridEl) {
+            gridEl.innerHTML = `
+              <div style="grid-column: 1 / -1; padding: 48px 24px; text-align: center; color: var(--text-muted); background: rgba(15, 23, 42, 0.4); border: 1px dashed rgba(255, 255, 255, 0.08); border-radius: var(--radius-md);">
+                <div style="font-size: 32px; margin-bottom: 8px;">🎬</div>
+                <div style="font-size: 14px; font-weight: 600; color: #E2E8F0;">Nenhum evento registrado neste período.</div>
+                <div style="font-size: 12px; margin-top: 4px;">Quando os animais entrarem na área configurada, os clipes com miniatura aparecerão aqui.</div>
+              </div>
+            `;
+          }
+          if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum evento registrado neste período.</td></tr>';
+          }
           return;
         }
 
-        tbody.innerHTML = visits.map(v => {
-          const startTime = v.start_time.split(' ')[1] || v.start_time;
-          const endTime = v.end_time.split(' ')[1] || v.end_time;
-          const dateStr = v.start_time.split(' ')[0] || '';
-          
-          let visitorBadge = '🐱 Gato';
-          const vName = v.visitor_name || 'Gato';
-          if (vName.includes('Ambos')) {
-            visitorBadge = '<span style="color: #F59E0B; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🐾 Ambos</span>';
-          } else if (vName.includes('Beatriz')) {
-            visitorBadge = '<span style="color: #FB923C; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🧡 Beatriz</span>';
-          } else if (vName.includes('Serena')) {
-            visitorBadge = '<span style="color: #94A3B8; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🩶 Serena</span>';
-          } else if (vName.includes('Noturno')) {
-            visitorBadge = '<span style="color: #64748B; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">🌙 Gato (P&B)</span>';
-          } else {
-            visitorBadge = `<span style="color: #CBD5E1;">${vName}</span>`;
-          }
+        if (countEl) countEl.innerText = `${visits.length} vídeo${visits.length > 1 ? 's' : ''}`;
 
-          return `
-            <tr>
-              <td>
-                <div style="font-weight: 600; color: #FFF;">${startTime}</div>
-                <div style="font-size: 11px; color: var(--text-muted);">${dateStr}</div>
-              </td>
-              <td>${endTime}</td>
-              <td>${visitorBadge}</td>
-              <td>
-                <span class="duration-badge">⏱️ ${v.duration_seconds}s</span>
-              </td>
-              <td>
-                <div style="display: flex; gap: 8px;">
+        // Renderiza a Grade estilo YouTube
+        if (gridEl) {
+          gridEl.innerHTML = visits.map(v => {
+            const startTime = v.start_time.split(' ')[1] || v.start_time;
+            const endTime = v.end_time.split(' ')[1] || v.end_time;
+            const dateStr = v.start_time.split(' ')[0] || '';
+            const vName = v.visitor_name || 'Gato';
+            const durationStr = formatVideoDuration(v.duration_seconds);
+
+            let visitorBadge = '🐱 Gato';
+            let avatarIcon = '🐱';
+            if (vName.includes('Ambos')) {
+              visitorBadge = '<span style="color: #F59E0B;">🐾 Ambos</span>';
+              avatarIcon = '🐾';
+            } else if (vName.includes('Beatriz')) {
+              visitorBadge = '<span style="color: #FB923C;">🧡 Beatriz</span>';
+              avatarIcon = '🧡';
+            } else if (vName.includes('Serena')) {
+              visitorBadge = '<span style="color: #94A3B8;">🩶 Serena</span>';
+              avatarIcon = '🩶';
+            } else if (vName.includes('Noturno')) {
+              visitorBadge = '<span style="color: #64748B;">🌙 Noturno</span>';
+              avatarIcon = '🌙';
+            } else if (vName.includes('Veículo') || vName.includes('Carro')) {
+              visitorBadge = '<span style="color: #38BDF8;">🚗 Veículo</span>';
+              avatarIcon = '🚗';
+            } else if (vName.includes('Pessoa')) {
+              visitorBadge = '<span style="color: #A855F7;">👤 Pessoa</span>';
+              avatarIcon = '👤';
+            } else {
+              visitorBadge = `<span style="color: #CBD5E1;">${vName}</span>`;
+            }
+
+            const thumbUrl = v.video_filename 
+              ? `/api/recordings/${encodeURIComponent(v.video_filename)}/thumbnail` 
+              : '';
+
+            return `
+              <div class="yt-card" onclick="${v.video_filename ? `openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})` : ''}">
+                <div class="yt-thumb-wrapper">
                   ${v.video_filename ? `
-                    <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})">
-                      ▶️ Clipe
+                    <img src="${thumbUrl}" 
+                         class="yt-thumb-img" 
+                         alt="Miniatura de ${vName}" 
+                         loading="lazy"
+                         onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'320\\' height=\\'180\\' viewBox=\\'0 0 320 180\\'><rect fill=\\'%230b0f19\\' width=\\'320\\' height=\\'180\\'/><text fill=\\'%2364748b\\' font-family=\\'sans-serif\\' font-size=\\'13\\' dy=\\'5\\' font-weight=\\'bold\\' x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\'>🎬 Carregando miniatura...</text></svg>';" />
+                    <div class="yt-play-overlay">
+                      <div class="yt-play-icon">▶</div>
+                    </div>
+                    <div class="yt-duration-badge">⏱️ ${durationStr}</div>
+                  ` : `
+                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px;">Sem gravação</div>
+                  `}
+                  <div class="yt-badge-tag">${visitorBadge}</div>
+                </div>
+
+                <div class="yt-details">
+                  <div class="yt-avatar">${avatarIcon}</div>
+                  <div class="yt-meta">
+                    <div class="yt-title" title="${vName} • ${dateStr} às ${startTime}">${vName} detectado(a)</div>
+                    <div class="yt-author">${vName} • Duração de ${v.duration_seconds}s</div>
+                    <div class="yt-time-info">📅 ${dateStr} às ${startTime} (até ${endTime})</div>
+                  </div>
+                </div>
+
+                <div class="yt-actions" onclick="event.stopPropagation();">
+                  ${v.video_filename ? `
+                    <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; gap: 4px;" onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})">
+                      ▶️ Assistir
                     </button>
-                  ` : '<span style="font-size: 12px; color: var(--text-muted);">Sem clipe</span>'}
-                  <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteVisit(${v.id})">
+                    <a href="/api/recordings/${encodeURIComponent(v.video_filename)}" download="${v.video_filename}" class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; text-decoration: none; gap: 4px;" title="Baixar gravação para o PC">
+                      ⬇️ Baixar
+                    </a>
+                  ` : '<span style="font-size: 11px; color: var(--text-muted);">Apenas registro</span>'}
+                  <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteVisit(${v.id})" title="Excluir este evento">
                     🗑️
                   </button>
                 </div>
-              </td>
-            </tr>
-          `;
-        }).join('');
+              </div>
+            `;
+          }).join('');
+        }
+
+        // Renderiza a Tabela clássica
+        if (tbody) {
+          tbody.innerHTML = visits.map(v => {
+            const startTime = v.start_time.split(' ')[1] || v.start_time;
+            const endTime = v.end_time.split(' ')[1] || v.end_time;
+            const dateStr = v.start_time.split(' ')[0] || '';
+            const vName = v.visitor_name || 'Gato';
+
+            let visitorBadge = '🐱 Gato';
+            if (vName.includes('Ambos')) {
+              visitorBadge = '<span style="color: #F59E0B; font-weight: 600;">🐾 Ambos</span>';
+            } else if (vName.includes('Beatriz')) {
+              visitorBadge = '<span style="color: #FB923C; font-weight: 600;">🧡 Beatriz</span>';
+            } else if (vName.includes('Serena')) {
+              visitorBadge = '<span style="color: #94A3B8; font-weight: 600;">🩶 Serena</span>';
+            } else if (vName.includes('Noturno')) {
+              visitorBadge = '<span style="color: #64748B; font-size: 12px;">🌙 Gato (P&B)</span>';
+            } else {
+              visitorBadge = `<span style="color: #CBD5E1;">${vName}</span>`;
+            }
+
+            const thumbUrl = v.video_filename 
+              ? `/api/recordings/${encodeURIComponent(v.video_filename)}/thumbnail` 
+              : '';
+
+            return `
+              <tr>
+                <td>
+                  ${v.video_filename ? `
+                    <img src="${thumbUrl}" 
+                         style="width: 72px; aspect-ratio: 16/9; border-radius: 6px; object-fit: cover; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);" 
+                         onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})"
+                         title="Clique para assistir"
+                         loading="lazy" />
+                  ` : '<span style="font-size: 11px; color: var(--text-muted);">Sem foto</span>'}
+                </td>
+                <td>
+                  <div style="font-weight: 600; color: #FFF;">${startTime}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">${dateStr}</div>
+                </td>
+                <td>${endTime}</td>
+                <td>${visitorBadge}</td>
+                <td>
+                  <span class="duration-badge">⏱️ ${v.duration_seconds}s</span>
+                </td>
+                <td>
+                  <div style="display: flex; gap: 8px;">
+                    ${v.video_filename ? `
+                      <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})">
+                        ▶️ Clipe
+                      </button>
+                    ` : '<span style="font-size: 12px; color: var(--text-muted);">Sem clipe</span>'}
+                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteVisit(${v.id})">
+                      🗑️
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
 
       } catch (e) {
         console.error("Erro ao carregar histórico:", e);

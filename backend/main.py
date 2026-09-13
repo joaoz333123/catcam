@@ -10,6 +10,7 @@ import asyncio
 import json
 import httpx
 import websockets
+import cv2
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -285,9 +286,22 @@ def list_visits(range: Optional[str] = None, limit: int = 50, authorized: bool =
 
 @app.delete("/api/visits/{visit_id}")
 def remove_visit(visit_id: int, authorized: bool = Depends(require_auth)):
+    visits = get_visits(limit=500)
+    target_v = next((v for v in visits if v.get("id") == visit_id), None)
     success = delete_visit(visit_id)
     if not success:
         raise HTTPException(status_code=404, detail="Visita não encontrada.")
+    if target_v and target_v.get("video_filename"):
+        base_name = os.path.splitext(target_v["video_filename"])[0]
+        v_path = os.path.join(RECORDINGS_DIR, f"{base_name}.mp4")
+        t_path = os.path.join(RECORDINGS_DIR, f"{base_name}.jpg")
+        try:
+            if os.path.exists(v_path):
+                os.remove(v_path)
+            if os.path.exists(t_path):
+                os.remove(t_path)
+        except Exception:
+            pass
     return {"status": "success", "deleted_id": visit_id}
 
 @app.get("/api/roi")
@@ -381,6 +395,51 @@ def get_recording(filename: str, authorized: bool = Depends(require_auth)):
             "Content-Disposition": f'inline; filename="{filename}"'
         }
     )
+
+@app.get("/api/recordings/{filename}/thumbnail")
+def get_recording_thumbnail(filename: str, authorized: bool = Depends(require_auth)):
+    """
+    Retorna a miniatura da gravação em formato JPEG.
+    Se já existir o .jpg correspondente, serve imediatamente com cache de 24h.
+    Se for um vídeo antigo sem thumbnail, extrai um frame representativo automaticamente e salva.
+    """
+    base_name = os.path.splitext(filename)[0]
+    thumb_path = os.path.join(RECORDINGS_DIR, f"{base_name}.jpg")
+    video_path = os.path.join(RECORDINGS_DIR, f"{base_name}.mp4")
+
+    # 1. Se thumbnail em disco já existe
+    if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0:
+        return FileResponse(
+            thumb_path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=86400"}
+        )
+
+    # 2. Se o vídeo existe, extrai um quadro e gera a miniatura
+    if os.path.exists(video_path):
+        try:
+            cap = cv2.VideoCapture(video_path)
+            fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
+            # Pula ~0.8s para pegar o animal já dentro da área
+            target_frame = max(0, int(fps * 0.8))
+            cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+            cap.release()
+
+            if ret and frame is not None:
+                cv2.imwrite(thumb_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                return FileResponse(
+                    thumb_path,
+                    media_type="image/jpeg",
+                    headers={"Cache-Control": "public, max-age=86400"}
+                )
+        except Exception as e:
+            print(f"[Thumbnail] Erro ao extrair miniatura do vídeo {filename}: {e}")
+
+    raise HTTPException(status_code=404, detail="Miniatura não disponível para esta gravação.")
 
 # Servir Frontend
 @app.get("/", response_class=HTMLResponse)
