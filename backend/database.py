@@ -45,26 +45,44 @@ def record_visit(start_time: str, end_time: str, duration_seconds: int, video_fi
     conn.close()
     return visit_id
 
-def get_visits(filter_range: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+def get_visits(filter_range: Optional[str] = None, visitor: Optional[str] = None, limit: int = 150) -> List[Dict[str, Any]]:
     conn = get_connection()
     cursor = conn.cursor()
     
     query = "SELECT * FROM visits"
+    where_clauses = []
     params = []
     
     if filter_range == "today":
         today_str = datetime.now().strftime("%Y-%m-%d")
-        query += " WHERE start_time LIKE ?"
+        where_clauses.append("start_time LIKE ?")
         params.append(f"{today_str}%")
     elif filter_range == "yesterday":
         yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        query += " WHERE start_time LIKE ?"
+        where_clauses.append("start_time LIKE ?")
         params.append(f"{yesterday_str}%")
     elif filter_range == "week":
         week_ago_str = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        query += " WHERE start_time >= ?"
+        where_clauses.append("start_time >= ?")
         params.append(week_ago_str)
+
+    if visitor and visitor != "all":
+        v_lower = visitor.lower().strip()
+        if v_lower == "beatriz":
+            where_clauses.append("(visitor_name LIKE '%Beatriz%' OR visitor_name LIKE '%Ambos%')")
+        elif v_lower == "serena":
+            where_clauses.append("(visitor_name LIKE '%Serena%' OR visitor_name LIKE '%Ambos%')")
+        elif v_lower in ("cats", "gato", "gatos"):
+            where_clauses.append("(visitor_name LIKE '%Gato%' OR visitor_name LIKE '%Beatriz%' OR visitor_name LIKE '%Serena%' OR visitor_name LIKE '%Ambos%')")
+        elif v_lower in ("others", "outros"):
+            where_clauses.append("(visitor_name NOT LIKE '%Gato%' AND visitor_name NOT LIKE '%Beatriz%' AND visitor_name NOT LIKE '%Serena%' AND visitor_name NOT LIKE '%Ambos%')")
+        else:
+            where_clauses.append("visitor_name LIKE ?")
+            params.append(f"%{visitor}%")
         
+    if where_clauses:
+        query += " WHERE " + " AND ".join(where_clauses)
+
     query += " ORDER BY id DESC LIMIT ?"
     params.append(limit)
     

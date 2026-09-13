@@ -281,8 +281,8 @@ def get_status(authorized: bool = Depends(require_auth)):
     }
 
 @app.get("/api/visits")
-def list_visits(range: Optional[str] = None, limit: int = 50, authorized: bool = Depends(require_auth)):
-    return get_visits(filter_range=range, limit=limit)
+def list_visits(range: Optional[str] = None, visitor: Optional[str] = None, limit: int = 150, authorized: bool = Depends(require_auth)):
+    return get_visits(filter_range=range, visitor=visitor, limit=limit)
 
 @app.delete("/api/visits/{visit_id}")
 def remove_visit(visit_id: int, authorized: bool = Depends(require_auth)):

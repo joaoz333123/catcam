@@ -824,6 +824,69 @@
       gap: 8px;
     }
 
+    /* Barra de Chips / Filtros Estilo YouTube */
+    .yt-chip-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 0 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+
+    .yt-chip-bar::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    .yt-chip-bar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+
+    .yt-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+
+    .yt-chip:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #FFF;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .yt-chip.active {
+      background: #F8FAFC;
+      color: #0F172A;
+      font-weight: 700;
+      border-color: #F8FAFC;
+      box-shadow: 0 2px 10px rgba(255, 255, 255, 0.2);
+    }
+
+    .yt-chip-count {
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      font-weight: 600;
+    }
+
+    .yt-chip.active .yt-chip-count {
+      background: rgba(15, 23, 42, 0.15);
+      color: #0F172A;
+    }
+
     /* Modal Genérico */
     .modal-overlay {
       position: fixed;
@@ -1460,6 +1523,11 @@
         </div>
       </div>
 
+      <!-- Barra de Filtros por Animal / Categoria (Estilo YouTube) -->
+      <div class="yt-chip-bar" id="visitor-filter-chips">
+        <!-- Gerado dinamicamente com as contagens reais -->
+      </div>
+
       <!-- Grade Estilo YouTube -->
       <div id="yt-video-grid" class="yt-grid">
         <div class="empty-state" style="grid-column: 1 / -1;">Carregando gravações com miniaturas...</div>
@@ -1637,6 +1705,8 @@
     }
 
     let currentFilter = 'today';
+    let currentVisitorFilter = 'all';
+    let allVisitsCache = [];
     let roiEditing = false;
     let polygon = [
       [0.25, 0.35],
@@ -2311,182 +2381,284 @@
       return `${m}:${s}`;
     }
 
+    function isCatVisitor(name) {
+      if (!name) return true;
+      const n = name.toLowerCase();
+      return n.includes('gato') || n.includes('beatriz') || n.includes('serena') || n.includes('ambos') || n.includes('noturno') || n.includes('cat');
+    }
+
+    function getVisitorIcon(name) {
+      if (!name) return '🐱';
+      if (name.includes('Ambos')) return '🐾';
+      if (name.includes('Beatriz')) return '🧡';
+      if (name.includes('Serena')) return '🩶';
+      if (name.includes('Noturno')) return '🌙';
+      if (name.includes('Pessoa')) return '👤';
+      if (name.includes('Cachorro')) return '🐶';
+      if (name.includes('Veículo') || name.includes('Carro')) return '🚗';
+      return isCatVisitor(name) ? '🐱' : '🏷️';
+    }
+
+    function getVisitorBadge(name) {
+      const vName = name || 'Gato';
+      if (vName.includes('Ambos')) return '<span style="color: #F59E0B; font-weight: 600;">🐾 Ambos</span>';
+      if (vName.includes('Beatriz')) return '<span style="color: #FB923C; font-weight: 600;">🧡 Beatriz</span>';
+      if (vName.includes('Serena')) return '<span style="color: #94A3B8; font-weight: 600;">🩶 Serena</span>';
+      if (vName.includes('Noturno')) return '<span style="color: #64748B;">🌙 Noturno</span>';
+      if (vName.includes('Veículo') || vName.includes('Carro')) return '<span style="color: #38BDF8; font-weight: 600;">🚗 Veículo</span>';
+      if (vName.includes('Pessoa')) return '<span style="color: #A855F7; font-weight: 600;">👤 Pessoa</span>';
+      if (vName.includes('Cachorro')) return '<span style="color: #10B981; font-weight: 600;">🐶 Cachorro</span>';
+      return `<span style="color: #CBD5E1;">${vName}</span>`;
+    }
+
+    function renderVisitorFilterChips() {
+      const chipsBar = document.getElementById('visitor-filter-chips');
+      if (!chipsBar) return;
+
+      const countAll = allVisitsCache.length;
+      const countCats = allVisitsCache.filter(v => isCatVisitor(v.visitor_name)).length;
+      const countBeatriz = allVisitsCache.filter(v => (v.visitor_name || '').includes('Beatriz') || (v.visitor_name || '').includes('Ambos')).length;
+      const countSerena = allVisitsCache.filter(v => (v.visitor_name || '').includes('Serena') || (v.visitor_name || '').includes('Ambos')).length;
+
+      // Localiza categorias que não são gatos
+      const otherMap = {};
+      allVisitsCache.forEach(v => {
+        if (!isCatVisitor(v.visitor_name)) {
+          const name = (v.visitor_name || 'Outro').trim();
+          otherMap[name] = (otherMap[name] || 0) + 1;
+        }
+      });
+
+      const chips = [
+        { id: 'all', label: 'Todos', count: countAll, icon: '📋' },
+        { id: 'cats', label: 'Qualquer Gato', count: countCats, icon: '🐱' },
+        { id: 'beatriz', label: 'Beatriz', count: countBeatriz, icon: '🧡' },
+        { id: 'serena', label: 'Serena', count: countSerena, icon: '🩶' },
+      ];
+
+      const otherKeys = Object.keys(otherMap);
+      otherKeys.forEach(name => {
+        let icon = '🏷️';
+        if (name.includes('Pessoa')) icon = '👤';
+        else if (name.includes('Cachorro')) icon = '🐶';
+        else if (name.includes('Veículo') || name.includes('Carro')) icon = '🚗';
+        chips.push({ id: `target:${name}`, label: name, count: otherMap[name], icon });
+      });
+
+      const countTotalOthers = allVisitsCache.filter(v => !isCatVisitor(v.visitor_name)).length;
+      if (countTotalOthers > 0 && otherKeys.length > 1) {
+        chips.push({ id: 'others', label: 'Todos os Outros', count: countTotalOthers, icon: '📦' });
+      }
+
+      // Se o filtro selecionado não existir nesta listagem, reseta para 'all'
+      const validIds = chips.map(c => c.id);
+      if (!validIds.includes(currentVisitorFilter)) {
+        currentVisitorFilter = 'all';
+      }
+
+      chipsBar.innerHTML = chips.map(c => {
+        const isActive = c.id === currentVisitorFilter ? 'active' : '';
+        return `
+          <button class="yt-chip ${isActive}" onclick="setVisitorFilter('${c.id}')" title="Filtrar por ${c.label}">
+            <span>${c.icon} ${c.label}</span>
+            <span class="yt-chip-count">${c.count}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function setVisitorFilter(filterId) {
+      currentVisitorFilter = filterId;
+      document.querySelectorAll('.yt-chip').forEach(btn => {
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        if (onclickAttr.includes(`'${filterId}'`)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+      renderVisitsList();
+    }
+
+    function renderVisitsList() {
+      const countEl = document.getElementById('visits-total-count');
+      const gridEl = document.getElementById('yt-video-grid');
+      const tbody = document.getElementById('visits-tbody');
+
+      if (!allVisitsCache || allVisitsCache.length === 0) {
+        if (countEl) countEl.innerText = '0 vídeos';
+        if (gridEl) {
+          gridEl.innerHTML = `
+            <div style="grid-column: 1 / -1; padding: 48px 24px; text-align: center; color: var(--text-muted); background: rgba(15, 23, 42, 0.4); border: 1px dashed rgba(255, 255, 255, 0.08); border-radius: var(--radius-md);">
+              <div style="font-size: 32px; margin-bottom: 8px;">🎬</div>
+              <div style="font-size: 14px; font-weight: 600; color: #E2E8F0;">Nenhum evento registrado neste período.</div>
+              <div style="font-size: 12px; margin-top: 4px;">Quando os animais entrarem na área configurada, os clipes com miniatura aparecerão aqui.</div>
+            </div>
+          `;
+        }
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum evento registrado neste período.</td></tr>';
+        }
+        return;
+      }
+
+      // Aplica o filtro de categoria/animal ativo
+      let filtered = allVisitsCache;
+      if (currentVisitorFilter === 'cats') {
+        filtered = allVisitsCache.filter(v => isCatVisitor(v.visitor_name));
+      } else if (currentVisitorFilter === 'beatriz') {
+        filtered = allVisitsCache.filter(v => (v.visitor_name || '').includes('Beatriz') || (v.visitor_name || '').includes('Ambos'));
+      } else if (currentVisitorFilter === 'serena') {
+        filtered = allVisitsCache.filter(v => (v.visitor_name || '').includes('Serena') || (v.visitor_name || '').includes('Ambos'));
+      } else if (currentVisitorFilter === 'others') {
+        filtered = allVisitsCache.filter(v => !isCatVisitor(v.visitor_name));
+      } else if (currentVisitorFilter.startsWith('target:')) {
+        const targetName = currentVisitorFilter.replace('target:', '');
+        filtered = allVisitsCache.filter(v => (v.visitor_name || '').trim() === targetName);
+      }
+
+      if (countEl) {
+        countEl.innerText = `${filtered.length} de ${allVisitsCache.length} vídeo${allVisitsCache.length > 1 ? 's' : ''}`;
+      }
+
+      if (filtered.length === 0) {
+        if (gridEl) {
+          gridEl.innerHTML = `
+            <div style="grid-column: 1 / -1; padding: 40px 20px; text-align: center; color: var(--text-muted); background: rgba(15, 23, 42, 0.3); border: 1px dashed rgba(255, 255, 255, 0.06); border-radius: var(--radius-md);">
+              <div style="font-size: 28px; margin-bottom: 8px;">🔍</div>
+              <div style="font-size: 14px; font-weight: 600; color: #E2E8F0;">Nenhuma gravação encontrada com este filtro.</div>
+              <div style="font-size: 12px; margin-top: 4px;">Tente selecionar outro filtro acima ou clique em "Todos".</div>
+            </div>
+          `;
+        }
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum evento registrado para o filtro selecionado.</td></tr>';
+        }
+        return;
+      }
+
+      // Renderiza Grade YouTube
+      if (gridEl) {
+        gridEl.innerHTML = filtered.map(v => {
+          const startTime = v.start_time.split(' ')[1] || v.start_time;
+          const endTime = v.end_time.split(' ')[1] || v.end_time;
+          const dateStr = v.start_time.split(' ')[0] || '';
+          const vName = v.visitor_name || 'Gato';
+          const durationStr = formatVideoDuration(v.duration_seconds);
+          const visitorBadge = getVisitorBadge(vName);
+          const avatarIcon = getVisitorIcon(vName);
+
+          const thumbUrl = v.video_filename 
+            ? `/api/recordings/${encodeURIComponent(v.video_filename)}/thumbnail` 
+            : '';
+
+          return `
+            <div class="yt-card" onclick="${v.video_filename ? `openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})` : ''}">
+              <div class="yt-thumb-wrapper">
+                ${v.video_filename ? `
+                  <img src="${thumbUrl}" 
+                       class="yt-thumb-img" 
+                       alt="Miniatura de ${vName}" 
+                       loading="lazy"
+                       onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'320\\' height=\\'180\\' viewBox=\\'0 0 320 180\\'><rect fill=\\'%230b0f19\\' width=\\'320\\' height=\\'180\\'/><text fill=\\'%2364748b\\' font-family=\\'sans-serif\\' font-size=\\'13\\' dy=\\'5\\' font-weight=\\'bold\\' x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\'>🎬 Carregando miniatura...</text></svg>';" />
+                  <div class="yt-play-overlay">
+                    <div class="yt-play-icon">▶</div>
+                  </div>
+                  <div class="yt-duration-badge">⏱️ ${durationStr}</div>
+                ` : `
+                  <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px;">Sem gravação</div>
+                `}
+                <div class="yt-badge-tag">${visitorBadge}</div>
+              </div>
+
+              <div class="yt-details">
+                <div class="yt-avatar">${avatarIcon}</div>
+                <div class="yt-meta">
+                  <div class="yt-title" title="${vName} • ${dateStr} às ${startTime}">${vName} detectado(a)</div>
+                  <div class="yt-author">${vName} • Duração de ${v.duration_seconds}s</div>
+                  <div class="yt-time-info">📅 ${dateStr} às ${startTime} (até ${endTime})</div>
+                </div>
+              </div>
+
+              <div class="yt-actions" onclick="event.stopPropagation();">
+                ${v.video_filename ? `
+                  <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; gap: 4px;" onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})">
+                    ▶️ Assistir
+                  </button>
+                  <a href="/api/recordings/${encodeURIComponent(v.video_filename)}" download="${v.video_filename}" class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; text-decoration: none; gap: 4px;" title="Baixar gravação para o PC">
+                    ⬇️ Baixar
+                  </a>
+                ` : '<span style="font-size: 11px; color: var(--text-muted);">Apenas registro</span>'}
+                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteVisit(${v.id})" title="Excluir este evento">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Renderiza Tabela Clássica
+      if (tbody) {
+        tbody.innerHTML = filtered.map(v => {
+          const startTime = v.start_time.split(' ')[1] || v.start_time;
+          const endTime = v.end_time.split(' ')[1] || v.end_time;
+          const dateStr = v.start_time.split(' ')[0] || '';
+          const vName = v.visitor_name || 'Gato';
+          const visitorBadge = getVisitorBadge(vName);
+
+          const thumbUrl = v.video_filename 
+            ? `/api/recordings/${encodeURIComponent(v.video_filename)}/thumbnail` 
+            : '';
+
+          return `
+            <tr>
+              <td>
+                ${v.video_filename ? `
+                  <img src="${thumbUrl}" 
+                       style="width: 72px; aspect-ratio: 16/9; border-radius: 6px; object-fit: cover; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);" 
+                       onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})"
+                       title="Clique para assistir"
+                       loading="lazy" />
+                ` : '<span style="font-size: 11px; color: var(--text-muted);">Sem foto</span>'}
+              </td>
+              <td>
+                <div style="font-weight: 600; color: #FFF;">${startTime}</div>
+                <div style="font-size: 11px; color: var(--text-muted);">${dateStr}</div>
+              </td>
+              <td>${endTime}</td>
+              <td>${visitorBadge}</td>
+              <td>
+                <span class="duration-badge">⏱️ ${v.duration_seconds}s</span>
+              </td>
+              <td>
+                <div style="display: flex; gap: 8px;">
+                  ${v.video_filename ? `
+                    <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})">
+                      ▶️ Clipe
+                    </button>
+                  ` : '<span style="font-size: 12px; color: var(--text-muted);">Sem clipe</span>'}
+                  <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteVisit(${v.id})">
+                    🗑️
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
     async function loadVisits() {
       try {
         const url = currentFilter === 'all' ? '/api/visits' : `/api/visits?range=${currentFilter}`;
         const res = await fetch(url);
         if (res.status === 401) { checkAuth(); return; }
         if (!res.ok) return;
-        const visits = await res.json();
+        allVisitsCache = (await res.json()) || [];
         
-        const countEl = document.getElementById('visits-total-count');
-        const gridEl = document.getElementById('yt-video-grid');
-        const tbody = document.getElementById('visits-tbody');
-
-        if (!visits || visits.length === 0) {
-          if (countEl) countEl.innerText = '0 vídeos';
-          if (gridEl) {
-            gridEl.innerHTML = `
-              <div style="grid-column: 1 / -1; padding: 48px 24px; text-align: center; color: var(--text-muted); background: rgba(15, 23, 42, 0.4); border: 1px dashed rgba(255, 255, 255, 0.08); border-radius: var(--radius-md);">
-                <div style="font-size: 32px; margin-bottom: 8px;">🎬</div>
-                <div style="font-size: 14px; font-weight: 600; color: #E2E8F0;">Nenhum evento registrado neste período.</div>
-                <div style="font-size: 12px; margin-top: 4px;">Quando os animais entrarem na área configurada, os clipes com miniatura aparecerão aqui.</div>
-              </div>
-            `;
-          }
-          if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum evento registrado neste período.</td></tr>';
-          }
-          return;
-        }
-
-        if (countEl) countEl.innerText = `${visits.length} vídeo${visits.length > 1 ? 's' : ''}`;
-
-        // Renderiza a Grade estilo YouTube
-        if (gridEl) {
-          gridEl.innerHTML = visits.map(v => {
-            const startTime = v.start_time.split(' ')[1] || v.start_time;
-            const endTime = v.end_time.split(' ')[1] || v.end_time;
-            const dateStr = v.start_time.split(' ')[0] || '';
-            const vName = v.visitor_name || 'Gato';
-            const durationStr = formatVideoDuration(v.duration_seconds);
-
-            let visitorBadge = '🐱 Gato';
-            let avatarIcon = '🐱';
-            if (vName.includes('Ambos')) {
-              visitorBadge = '<span style="color: #F59E0B;">🐾 Ambos</span>';
-              avatarIcon = '🐾';
-            } else if (vName.includes('Beatriz')) {
-              visitorBadge = '<span style="color: #FB923C;">🧡 Beatriz</span>';
-              avatarIcon = '🧡';
-            } else if (vName.includes('Serena')) {
-              visitorBadge = '<span style="color: #94A3B8;">🩶 Serena</span>';
-              avatarIcon = '🩶';
-            } else if (vName.includes('Noturno')) {
-              visitorBadge = '<span style="color: #64748B;">🌙 Noturno</span>';
-              avatarIcon = '🌙';
-            } else if (vName.includes('Veículo') || vName.includes('Carro')) {
-              visitorBadge = '<span style="color: #38BDF8;">🚗 Veículo</span>';
-              avatarIcon = '🚗';
-            } else if (vName.includes('Pessoa')) {
-              visitorBadge = '<span style="color: #A855F7;">👤 Pessoa</span>';
-              avatarIcon = '👤';
-            } else {
-              visitorBadge = `<span style="color: #CBD5E1;">${vName}</span>`;
-            }
-
-            const thumbUrl = v.video_filename 
-              ? `/api/recordings/${encodeURIComponent(v.video_filename)}/thumbnail` 
-              : '';
-
-            return `
-              <div class="yt-card" onclick="${v.video_filename ? `openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})` : ''}">
-                <div class="yt-thumb-wrapper">
-                  ${v.video_filename ? `
-                    <img src="${thumbUrl}" 
-                         class="yt-thumb-img" 
-                         alt="Miniatura de ${vName}" 
-                         loading="lazy"
-                         onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'320\\' height=\\'180\\' viewBox=\\'0 0 320 180\\'><rect fill=\\'%230b0f19\\' width=\\'320\\' height=\\'180\\'/><text fill=\\'%2364748b\\' font-family=\\'sans-serif\\' font-size=\\'13\\' dy=\\'5\\' font-weight=\\'bold\\' x=\\'50%25\\' y=\\'50%25\\' text-anchor=\\'middle\\'>🎬 Carregando miniatura...</text></svg>';" />
-                    <div class="yt-play-overlay">
-                      <div class="yt-play-icon">▶</div>
-                    </div>
-                    <div class="yt-duration-badge">⏱️ ${durationStr}</div>
-                  ` : `
-                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px;">Sem gravação</div>
-                  `}
-                  <div class="yt-badge-tag">${visitorBadge}</div>
-                </div>
-
-                <div class="yt-details">
-                  <div class="yt-avatar">${avatarIcon}</div>
-                  <div class="yt-meta">
-                    <div class="yt-title" title="${vName} • ${dateStr} às ${startTime}">${vName} detectado(a)</div>
-                    <div class="yt-author">${vName} • Duração de ${v.duration_seconds}s</div>
-                    <div class="yt-time-info">📅 ${dateStr} às ${startTime} (até ${endTime})</div>
-                  </div>
-                </div>
-
-                <div class="yt-actions" onclick="event.stopPropagation();">
-                  ${v.video_filename ? `
-                    <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; gap: 4px;" onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})">
-                      ▶️ Assistir
-                    </button>
-                    <a href="/api/recordings/${encodeURIComponent(v.video_filename)}" download="${v.video_filename}" class="btn btn-outline" style="padding: 4px 10px; font-size: 11px; text-decoration: none; gap: 4px;" title="Baixar gravação para o PC">
-                      ⬇️ Baixar
-                    </a>
-                  ` : '<span style="font-size: 11px; color: var(--text-muted);">Apenas registro</span>'}
-                  <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="deleteVisit(${v.id})" title="Excluir este evento">
-                    🗑️
-                  </button>
-                </div>
-              </div>
-            `;
-          }).join('');
-        }
-
-        // Renderiza a Tabela clássica
-        if (tbody) {
-          tbody.innerHTML = visits.map(v => {
-            const startTime = v.start_time.split(' ')[1] || v.start_time;
-            const endTime = v.end_time.split(' ')[1] || v.end_time;
-            const dateStr = v.start_time.split(' ')[0] || '';
-            const vName = v.visitor_name || 'Gato';
-
-            let visitorBadge = '🐱 Gato';
-            if (vName.includes('Ambos')) {
-              visitorBadge = '<span style="color: #F59E0B; font-weight: 600;">🐾 Ambos</span>';
-            } else if (vName.includes('Beatriz')) {
-              visitorBadge = '<span style="color: #FB923C; font-weight: 600;">🧡 Beatriz</span>';
-            } else if (vName.includes('Serena')) {
-              visitorBadge = '<span style="color: #94A3B8; font-weight: 600;">🩶 Serena</span>';
-            } else if (vName.includes('Noturno')) {
-              visitorBadge = '<span style="color: #64748B; font-size: 12px;">🌙 Gato (P&B)</span>';
-            } else {
-              visitorBadge = `<span style="color: #CBD5E1;">${vName}</span>`;
-            }
-
-            const thumbUrl = v.video_filename 
-              ? `/api/recordings/${encodeURIComponent(v.video_filename)}/thumbnail` 
-              : '';
-
-            return `
-              <tr>
-                <td>
-                  ${v.video_filename ? `
-                    <img src="${thumbUrl}" 
-                         style="width: 72px; aspect-ratio: 16/9; border-radius: 6px; object-fit: cover; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);" 
-                         onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})"
-                         title="Clique para assistir"
-                         loading="lazy" />
-                  ` : '<span style="font-size: 11px; color: var(--text-muted);">Sem foto</span>'}
-                </td>
-                <td>
-                  <div style="font-weight: 600; color: #FFF;">${startTime}</div>
-                  <div style="font-size: 11px; color: var(--text-muted);">${dateStr}</div>
-                </td>
-                <td>${endTime}</td>
-                <td>${visitorBadge}</td>
-                <td>
-                  <span class="duration-badge">⏱️ ${v.duration_seconds}s</span>
-                </td>
-                <td>
-                  <div style="display: flex; gap: 8px;">
-                    ${v.video_filename ? `
-                      <button class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="openVideoModal('${v.video_filename}', '${v.start_time}', ${v.duration_seconds})">
-                        ▶️ Clipe
-                      </button>
-                    ` : '<span style="font-size: 12px; color: var(--text-muted);">Sem clipe</span>'}
-                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" onclick="deleteVisit(${v.id})">
-                      🗑️
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            `;
-          }).join('');
-        }
-
+        renderVisitorFilterChips();
+        renderVisitsList();
       } catch (e) {
         console.error("Erro ao carregar histórico:", e);
       }
