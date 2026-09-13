@@ -1660,14 +1660,69 @@
       window.location.reload();
     }
 
+    const catCamTabId = Math.random().toString(36).substring(2);
+    let isTabStreaming = false;
+    const tabChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('catcam_tab_sync') : null;
+
+    function startWebRTCStream() {
+      const iframe = document.getElementById('webrtc-player-iframe');
+      if (iframe && (!iframe.src || iframe.src.includes('about:blank') || iframe.src.endsWith('/'))) {
+        iframe.src = '/go2rtc/stream.html?src=cat_cam';
+        isTabStreaming = true;
+      }
+    }
+
+    function stopWebRTCStream() {
+      const iframe = document.getElementById('webrtc-player-iframe');
+      if (iframe && iframe.src && !iframe.src.includes('about:blank')) {
+        iframe.src = 'about:blank';
+        isTabStreaming = false;
+      }
+    }
+
+    if (tabChannel) {
+      tabChannel.onmessage = (event) => {
+        if (event.data && event.data.type === 'NEW_TAB_ACTIVE' && event.data.tabId !== catCamTabId) {
+          // Quando outra aba assume o foco ou é aberta, pausa a transmissão desta para não colidir o WebRTC
+          if (document.hidden) {
+            stopWebRTCStream();
+          }
+        }
+      };
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!appServicesInitialized) return;
+      if (document.hidden) {
+        // Minimizado ou aba oculta: pausa o stream para economizar GPU/RAM e liberar a câmera
+        stopWebRTCStream();
+      } else {
+        // Aba ativa em primeiro plano: retoma o stream
+        startWebRTCStream();
+        if (tabChannel) {
+          tabChannel.postMessage({ type: 'NEW_TAB_ACTIVE', tabId: catCamTabId });
+        }
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      if (!appServicesInitialized) return;
+      if (!document.hidden && !isTabStreaming) {
+        startWebRTCStream();
+        if (tabChannel) {
+          tabChannel.postMessage({ type: 'NEW_TAB_ACTIVE', tabId: catCamTabId });
+        }
+      }
+    });
+
     function initAppServices() {
       if (appServicesInitialized) return;
       appServicesInitialized = true;
 
       // Iniciar WebRTC Stream
-      const iframe = document.getElementById('webrtc-player-iframe');
-      if (iframe && (!iframe.src || iframe.src === 'about:blank' || iframe.src.endsWith('/'))) {
-        iframe.src = '/go2rtc/stream.html?src=cat_cam';
+      startWebRTCStream();
+      if (tabChannel) {
+        tabChannel.postMessage({ type: 'NEW_TAB_ACTIVE', tabId: catCamTabId });
       }
 
       setViewMode(currentViewMode);

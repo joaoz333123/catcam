@@ -11,6 +11,7 @@ import json
 import threading
 import subprocess
 import webbrowser
+import ctypes
 from typing import Optional
 from PIL import Image
 import pystray
@@ -28,7 +29,8 @@ GO2RTC_EXE = os.path.join(PROJECT_DIR, "bin", "go2rtc.exe")
 CREATE_NO_WINDOW = 0x08000000
 
 class CatCamTrayApp:
-    def __init__(self):
+    def __init__(self, mutex=None):
+        self.mutex = mutex
         self.go2rtc_proc: Optional[subprocess.Popen] = None
         self.uvicorn_proc: Optional[subprocess.Popen] = None
         self.tunnel_proc: Optional[subprocess.Popen] = None
@@ -185,6 +187,12 @@ class CatCamTrayApp:
 
     def _on_exit(self, icon, item):
         self.stop_services()
+        if self.mutex:
+            try:
+                ctypes.windll.kernel32.CloseHandle(self.mutex)
+            except Exception:
+                pass
+            self.mutex = None
         if self.icon:
             self.icon.stop()
 
@@ -229,6 +237,23 @@ class CatCamTrayApp:
         )
         self.icon.run()
 
+def get_single_instance_mutex():
+    ERROR_ALREADY_EXISTS = 183
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "CatCamAI_SingleInstance_Mutex")
+    last_error = ctypes.windll.kernel32.GetLastError()
+    if last_error == ERROR_ALREADY_EXISTS:
+        if mutex:
+            ctypes.windll.kernel32.CloseHandle(mutex)
+        return None
+    return mutex
+
 if __name__ == "__main__":
-    app = CatCamTrayApp()
+    mutex = get_single_instance_mutex()
+    if mutex is None:
+        # A CatCam já está em execução em segundo plano na bandeja!
+        # Apenas foca/abre o painel no navegador padrão e encerra este novo processo para evitar instâncias duplicadas
+        webbrowser.open("http://localhost:8000")
+        sys.exit(0)
+
+    app = CatCamTrayApp(mutex=mutex)
     app.run()
