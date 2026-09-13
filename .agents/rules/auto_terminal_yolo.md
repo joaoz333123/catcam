@@ -2,31 +2,19 @@
 trigger: always_on
 ---
 
-# Rule: Modo YOLO - Execução Automática no Terminal
+# Regra: Modo YOLO, Segurança do Sistema e Documentação Atualizada
 
-- **Autorização Total de Comandos:** Executar todos os comandos no terminal (PowerShell, CMD, Bash) automaticamente sem solicitar confirmação ou pedir autorização prévia ao usuário.
-- **Fluxo Contínuo:** Manter a execução de tarefas e comandos no modo auto-approve / YOLO sem interromper o fluxo para diálogos de confirmação.
+## 1. Modo YOLO & Execução no Terminal
+- **Autorização Total e Contínua:** Executar todos os comandos no terminal (PowerShell, CMD, Bash) automaticamente de forma AUTO-APPROVED, sem pausar para solicitar confirmação ou pedir autorização prévia ao usuário.
+- **Fluxo Ágil:** Manter o fluxo de execução contínuo, realizando comandos locais e comandos remotos do GitHub necessários para o projeto de forma autônoma.
 
-## Restrições de Segurança Mandatory
+## 2. Restrições Estritas de Segurança do Sistema Operacional
+- **Proteção do Sistema Operacional (OS):** É estritamente proibido alterar, criar, modificar ou apagar arquivos, diretórios, registros ou configurações do sistema operacional (ex: `C:\Windows`, `C:\Program Files`, registros de sistema), EXCETO se expressamente aprovado pelo usuário.
+- **Escopo do Projeto:** Limitar todas as operações ao diretório do projeto e seus subdiretórios autorizados.
 
-- **Arquivos e Pastas do Sistema Operacional (OS):** É ESTRITAMENTE PROIBIDO alterar, criar, modificar ou apagar arquivos, diretórios, registros ou configurações do sistema operacional, exceto se APROVADO PELO USUARIO (ex: diretórios de sistema como `C:\Windows`, `C:\Program Files`, arquivos de configuração raiz do sistema, etc.).
+## 3. Comunicação Prévia de Ações e Ferramentas
+- **Verificação de Capacidade do Usuário:** Sempre perguntar ao usuário ANTES de solicitar qualquer ação manual ou dado técnico, verificando previamente se ele possui ferramentas ou condições de obter aquela informação ou realizar a etapa no computador.
 
-# Regras do Projeto (AGENTS.md)
-
-## Modo YOLO & Permissões de Terminal
-
-- Executar todos os comandos no terminal (PowerShell / CMD / Bash) automaticamente de forma AUTO-APPROVED, sem pausar para solicitar permissão ao usuário.
-
-## Restrições do Sistema Operacional
-
-- É estritamente proibido alterar, deletar ou modificar arquivos, diretórios e configurações do Sistema Operacional (OS), EXCETO SE APROVADO PELO USUÁRIO.
-
-## Regra Fundamental de Comunicação
-
-SEMPRE perguntar ao usuário ANTES de pedir qualquer ação ou dado técnico, para verificar se ele tem condições/ferramentas de obter aquela informação ou realizar aquela ação no computador, ou para fornecer informacoes para voce se necessario
-
-## SEMPRE BUSCAR ONLINE OS DOCS DA ULTIMA VERSAO DE QUALQUER SISTEMA QUE VC FOR USAR (FERRAMENTAS, BIBLIOTECAS, AGENTES, DOCS DO GEMINI ATUAIS)
-
-## PESQUISE ONLINE OS DOCS DO GEMINI 3.8 FLASH, QUE É O AGENTE DE AI QUE VOCE ESTÁ ATUALMENTE, PARA GARANTIR QUE NAO HAJA CITACOES OU FUNCOES DEPRECATED USADAS POR VOCE
-
-## PARA QUALQUER FERRAMENTA, SITES, PLATAFORMAS, SOFTWRES, BIBLIOTECAS, ENTRE OUTROS, SEMPRE BUSCAR OS DOCS OFICIAIS ANTES DE COMEÇAR A SUGERIR OU USAR PARA EVITAR ERROS
+## 4. Consulta Obrigatória à Documentação Oficial Atualizada
+- **Sempre Buscar Docs Oficiais:** Antes de sugerir, adotar ou alterar qualquer biblioteca, ferramenta, framework ou plataforma, pesquisar na documentação oficial da última versão estável para evitar erros e incompatibilidades.
+- **Alinhamento com o Modelo Atual (Gemini 3.8 Flash):** Garantir que nenhuma função, sintaxe ou padrão obsoleto (deprecated) seja utilizado, adotando as práticas e recursos vigentes da API.
