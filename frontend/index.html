@@ -1198,6 +1198,20 @@
                 </span>
               </div>
 
+              <div>
+                <label class="form-label" style="font-size: 12px; margin-bottom: 4px;">Intervalo Mínimo entre Alertas (Anti-Spam):</label>
+                <select id="cfg-notification-cooldown" class="form-input" style="padding: 6px 10px; font-size: 12px;" onchange="triggerAutoSave();">
+                  <option value="30">30 segundos</option>
+                  <option value="60" selected>1 minuto (Recomendado)</option>
+                  <option value="120">2 minutos</option>
+                  <option value="300">5 minutos</option>
+                  <option value="600">10 minutos</option>
+                </select>
+                <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">
+                  Garante apenas 1 notificação por visita e evita que o celular apite sem parar durante a permanência do pet.
+                </span>
+              </div>
+
               <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">
                 💡 Ao tocar nas notificações push no celular, a live abrirá automaticamente na URL Pública configurada acima.
               </div>
@@ -2269,6 +2283,7 @@
       const debounce = parseInt(document.getElementById('cfg-debounce').value);
 
       const notifEnabled = document.getElementById('cfg-notifications')?.checked ?? true;
+      const notifCooldown = parseInt(document.getElementById('cfg-notification-cooldown')?.value || "60", 10);
       const ntfyEnabled = document.getElementById('cfg-ntfy-enabled')?.checked ?? false;
       const ntfyTopic = document.getElementById('cfg-ntfy-topic')?.value || "";
       const publicUrl = document.getElementById('cfg-public-url')?.value || "";
@@ -2287,6 +2302,7 @@
             confidence_threshold: conf,
             debounce_seconds: debounce,
             notifications_enabled: notifEnabled,
+            notification_cooldown_seconds: notifCooldown,
             ntfy_enabled: ntfyEnabled,
             ntfy_topic: ntfyTopic,
             public_url: publicUrl
@@ -2476,6 +2492,10 @@
           if (data.notifications_enabled !== undefined) {
             const notifToggle = document.getElementById('cfg-notifications');
             if (notifToggle) notifToggle.checked = Boolean(data.notifications_enabled);
+          }
+          if (data.notification_cooldown_seconds !== undefined) {
+            const cdEl = document.getElementById('cfg-notification-cooldown');
+            if (cdEl) cdEl.value = String(data.notification_cooldown_seconds);
           }
           if (data.ntfy_enabled !== undefined) {
             const ntfyToggle = document.getElementById('cfg-ntfy-enabled');

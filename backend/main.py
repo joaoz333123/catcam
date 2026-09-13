@@ -74,6 +74,7 @@ class ROIUpdateRequest(BaseModel):
     target_presets: Optional[List[str]] = None
     extra_classes: Optional[List[int]] = None
     notifications_enabled: Optional[bool] = None
+    notification_cooldown_seconds: Optional[int] = None
     ntfy_enabled: Optional[bool] = None
     ntfy_topic: Optional[str] = None
     ntfy_server: Optional[str] = None
@@ -311,6 +312,7 @@ def update_roi(payload: ROIUpdateRequest, authorized: bool = Depends(require_aut
             target_presets=payload.target_presets,
             extra_classes=payload.extra_classes,
             notifications_enabled=payload.notifications_enabled,
+            notification_cooldown_seconds=payload.notification_cooldown_seconds,
             ntfy_enabled=payload.ntfy_enabled,
             ntfy_topic=payload.ntfy_topic,
             ntfy_server=payload.ntfy_server,

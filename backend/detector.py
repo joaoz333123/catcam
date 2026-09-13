@@ -1,5 +1,7 @@
 import os
 import sys
+import gc
+import queue
 
 # Otimização crítica de CPU: instrui o runtime OpenMP/oneTBB da Intel a suspender threads imediatamente
 # após a inferência (blocktime=0 e wait policy=passive), eliminando 100% do spin-wait de CPU
@@ -215,44 +217,68 @@ def is_matching_color(crop_bgr: np.ndarray, color_filter: str) -> bool:
     return True
 
 
+_video_conversion_queue = queue.Queue()
+
+def _execute_video_conversion(filepath: str, real_fps: Optional[float] = None):
+    if not os.path.exists(filepath):
+        return
+    tmp_path = filepath + ".tmp.mp4"
+    try:
+        # -threads 2 limita o uso de memória e CPU por processo do FFmpeg
+        cmd = [
+            "ffmpeg", "-y",
+            "-threads", "2"
+        ]
+        if real_fps is not None and real_fps > 0:
+            cmd.extend(["-r", f"{real_fps:.3f}"])
+        cmd.extend([
+            "-i", filepath,
+            "-c:v", "libx264",
+            "-r", "25",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            tmp_path
+        ])
+        res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+        if res.returncode == 0 and os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            os.replace(tmp_path, filepath)
+            print(f"[Detector] Vídeo sincronizado e convertido para H.264: {os.path.basename(filepath)}")
+        elif os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    except Exception as e:
+        print(f"[Detector] Erro ao converter vídeo para H.264: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+def _video_conversion_worker():
+    """Worker serial em background: processa um vídeo por vez sem sobrecarregar a memória RAM."""
+    while True:
+        try:
+            item = _video_conversion_queue.get()
+            if item is None:
+                break
+            filepath, real_fps = item
+            _execute_video_conversion(filepath, real_fps)
+        except Exception as e:
+            print(f"[Detector] Erro na fila de conversão: {e}")
+        finally:
+            _video_conversion_queue.task_done()
+            gc.collect()
+
+_conversion_thread = threading.Thread(target=_video_conversion_worker, daemon=True)
+_conversion_thread.start()
+
+
 def convert_video_to_h264(filepath: str, real_fps: Optional[float] = None):
     """
-    Converte o arquivo de vídeo gerado para H.264 (avc1) com moov atom no início (+faststart)
-    e sincroniza a taxa real de quadros (real_fps) para que a duração do vídeo corresponda
-    exatamente ao tempo real do evento (sem aceleração ou efeito timelapse).
+    Enfileira a conversão do vídeo gerado para H.264 (avc1) em fila serial,
+    garantindo que múltiplos vídeos seguidos nunca saturem a memória RAM do computador.
     """
-    def _worker():
-        if not os.path.exists(filepath):
-            return
-        tmp_path = filepath + ".tmp.mp4"
-        try:
-            cmd = ["ffmpeg", "-y"]
-            if real_fps is not None and real_fps > 0:
-                cmd.extend(["-r", f"{real_fps:.3f}"])
-            cmd.extend([
-                "-i", filepath,
-                "-c:v", "libx264",
-                "-r", "25",
-                "-preset", "ultrafast",
-                "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",
-                tmp_path
-            ])
-            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45)
-            if res.returncode == 0 and os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-                os.replace(tmp_path, filepath)
-                print(f"[Detector] Vídeo sincronizado em velocidade normal 1.0x ({real_fps or 25:.1f} FPS) e convertido para H.264: {os.path.basename(filepath)}")
-            elif os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        except Exception as e:
-            print(f"[Detector] Erro ao converter vídeo para H.264: {e}")
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except Exception:
-                    pass
-
-    threading.Thread(target=_worker, daemon=True).start()
+    _video_conversion_queue.put((filepath, real_fps))
 
 
 class FreshFrameReader(threading.Thread):
@@ -337,6 +363,7 @@ class CatCamDetector:
         self.current_video_writer = None
         self.current_video_filename = None
         self.visit_frames_written = 0
+        self.visit_alert_sent = False
         self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
         self.visit_other_counts: Dict[str, int] = collections.defaultdict(int)
         
@@ -344,6 +371,7 @@ class CatCamDetector:
         self.target_presets: List[str] = ["cats"]
         self.extra_classes: List[int] = []
         self.notifications_enabled: bool = True
+        self.notification_cooldown_seconds: int = 60
         self.ntfy_enabled: bool = False
         self.ntfy_topic: str = ""
         self.ntfy_server: str = "https://ntfy.sh"
@@ -361,6 +389,7 @@ class CatCamDetector:
             "target_presets": self.target_presets,
             "extra_classes": self.extra_classes,
             "notifications_enabled": self.notifications_enabled,
+            "notification_cooldown_seconds": self.notification_cooldown_seconds,
             "ntfy_enabled": self.ntfy_enabled,
             "ntfy_topic": self.ntfy_topic,
             "ntfy_server": self.ntfy_server,
@@ -409,6 +438,7 @@ class CatCamDetector:
                     self.target_presets = data.get("target_presets", ["cats"])
                     self.extra_classes = data.get("extra_classes", [])
                     self.notifications_enabled = data.get("notifications_enabled", True)
+                    self.notification_cooldown_seconds = max(10, int(data.get("notification_cooldown_seconds", 60)))
                     self.ntfy_enabled = data.get("ntfy_enabled", False)
                     self.ntfy_topic = data.get("ntfy_topic", "")
                     self.ntfy_server = data.get("ntfy_server", "https://ntfy.sh")
@@ -421,6 +451,7 @@ class CatCamDetector:
                     self.status["target_presets"] = self.target_presets
                     self.status["extra_classes"] = self.extra_classes
                     self.status["notifications_enabled"] = self.notifications_enabled
+                    self.status["notification_cooldown_seconds"] = self.notification_cooldown_seconds
                     self.status["ntfy_enabled"] = self.ntfy_enabled
                     self.status["ntfy_topic"] = self.ntfy_topic
                     self.status["ntfy_server"] = self.ntfy_server
@@ -439,6 +470,7 @@ class CatCamDetector:
                         target_presets: Optional[List[str]] = None,
                         extra_classes: Optional[List[int]] = None,
                         notifications_enabled: Optional[bool] = None,
+                        notification_cooldown_seconds: Optional[int] = None,
                         ntfy_enabled: Optional[bool] = None,
                         ntfy_topic: Optional[str] = None,
                         ntfy_server: Optional[str] = None,
@@ -474,6 +506,9 @@ class CatCamDetector:
         if notifications_enabled is not None:
             self.notifications_enabled = notifications_enabled
             self.status["notifications_enabled"] = self.notifications_enabled
+        if notification_cooldown_seconds is not None:
+            self.notification_cooldown_seconds = max(10, int(notification_cooldown_seconds))
+            self.status["notification_cooldown_seconds"] = self.notification_cooldown_seconds
         if ntfy_enabled is not None:
             self.ntfy_enabled = ntfy_enabled
             self.status["ntfy_enabled"] = self.ntfy_enabled
@@ -498,6 +533,7 @@ class CatCamDetector:
             "target_presets": self.target_presets,
             "extra_classes": self.extra_classes,
             "notifications_enabled": self.notifications_enabled,
+            "notification_cooldown_seconds": self.notification_cooldown_seconds,
             "ntfy_enabled": self.ntfy_enabled,
             "ntfy_topic": self.ntfy_topic,
             "ntfy_server": self.ntfy_server,
@@ -533,6 +569,7 @@ class CatCamDetector:
     def _run_loop(self):
         fps_monitor = sv.FPSMonitor()
         last_process_time = time.perf_counter()
+        loop_frame_count = 0
         
         while self.running:
             target_delay = 1.0 / max(1, self.target_fps)
@@ -541,6 +578,10 @@ class CatCamDetector:
             if time_to_wait > 0:
                 time.sleep(time_to_wait)
             last_process_time = time.perf_counter()
+
+            loop_frame_count += 1
+            if loop_frame_count % 300 == 0:
+                gc.collect()
 
             raw_frame = self.reader.get_frame()
             if raw_frame is None:
@@ -628,12 +669,13 @@ class CatCamDetector:
                     self.is_visiting = True
                     self.visit_start_time = now
                     self.visit_frames_written = 0
+                    self.visit_alert_sent = False
                     self.visit_cat_counts = {"Beatriz": 0, "Serena": 0, "Noturno": 0}
                     self.visit_other_counts = collections.defaultdict(int)
                     self.current_video_filename = f"evento_{now.strftime('%Y%m%d_%H%M%S')}.mp4"
                     video_filepath = os.path.join(RECORDINGS_DIR, self.current_video_filename)
                     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-                    self.current_video_writer = cv2.VideoWriter(video_filepath, fourcc, float(self.target_fps), (infer_w, infer_h))
+                    self.current_video_writer = cv2.VideoWriter(video_filepath, cv2.CAP_FFMPEG, fourcc, float(self.target_fps), (infer_w, infer_h))
                     print(f"[Detector] Evento iniciado em {now.strftime('%H:%M:%S')} - Gravando clipe fluido...")
 
             if self.is_visiting:
@@ -649,10 +691,12 @@ class CatCamDetector:
                     self.is_visiting = False
                     self.status["is_visiting"] = False
                     self.status["last_event_time"] = now.strftime("%H:%M:%S")
+                    self.visit_alert_sent = False
                     
                     if self.current_video_writer is not None:
                         self.current_video_writer.release()
                         self.current_video_writer = None
+                        gc.collect()
 
                     real_fps = max(1.0, round(self.visit_frames_written / max(1.0, duration), 3))
 
@@ -769,9 +813,9 @@ class CatCamDetector:
             ret_jpg, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             jpeg_bytes = jpeg_buf.tobytes() if ret_jpg else None
 
-            # Disparo Imediato de Notificação Windows, Som e Remota ntfy (com cooldown anti-spam)
+            # Disparo Imediato de Notificação Windows, Som e Remota ntfy (com anti-spam rigoroso)
             alert_payload = None
-            if obj_in_zone and self.notifications_enabled:
+            if self.is_visiting and not self.visit_alert_sent and self.notifications_enabled:
                 current_alert_target = None
                 for obj in objects_payload:
                     if obj.get("in_zone"):
@@ -780,10 +824,10 @@ class CatCamDetector:
 
                 if current_alert_target:
                     time_since_last = now_ts - self.last_notification_time
-                    target_changed = (current_alert_target != self.last_notified_target)
-                    if time_since_last > 25.0 or (target_changed and time_since_last > 6.0):
+                    if time_since_last >= self.notification_cooldown_seconds:
                         self.last_notification_time = now_ts
                         self.last_notified_target = current_alert_target
+                        self.visit_alert_sent = True
                         alert_payload = {
                             "target": current_alert_target,
                             "ts": now_ts
@@ -801,6 +845,9 @@ class CatCamDetector:
                                 server=self.ntfy_server,
                                 click_url=self.public_url or "http://localhost:8000"
                             )
+                    else:
+                        # Silencia durante o restante desta visita se ainda estiver no período de cooldown global
+                        self.visit_alert_sent = True
 
             if jpeg_bytes is not None:
                 with self.lock:
