@@ -1564,7 +1564,7 @@
         <button class="modal-close" onclick="closeVideoModal()">&times;</button>
       </div>
       <div class="modal-video-wrapper">
-        <video id="modal-video-player" controls preload="metadata" playsinline></video>
+        <video id="modal-video-player" controls preload="metadata" playsinline webkit-playsinline muted></video>
       </div>
     </div>
   </div>
@@ -2689,13 +2689,19 @@
 
       title.innerText = `Evento de ${startTime} (${duration} segundos)`;
       player.pause();
-      player.innerHTML = `<source src="/api/recordings/${encodeURIComponent(filename)}" type="video/mp4">Seu navegador não suporta vídeo HTML5.`;
+      player.muted = true;
+      player.setAttribute('playsinline', '');
+      player.setAttribute('webkit-playsinline', '');
+      
+      const videoSrc = `/api/recordings/${encodeURIComponent(filename)}`;
+      player.src = videoSrc;
       player.load();
+
       modal.style.display = 'flex';
       const playPromise = player.play();
       if (playPromise !== undefined) {
         playPromise.catch(e => {
-          console.warn("Reprodução automática aguardando interação:", e);
+          console.warn("Reprodução automática móvel aguardando interação:", e);
         });
       }
     }
@@ -2705,7 +2711,6 @@
       const player = document.getElementById('modal-video-player');
       player.pause();
       player.removeAttribute('src');
-      player.innerHTML = '';
       player.load();
       modal.style.display = 'none';
     }
